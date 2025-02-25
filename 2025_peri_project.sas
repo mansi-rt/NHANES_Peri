@@ -124,7 +124,6 @@ data merging_per_den;
 run;
 
 /* Creating a dataset to calculate periodontitis for all relevant teeth */
-
 data peri_all_teeth;
     set merging_per_den;
 	%peri_1t(02, OHX02LAD, OHX02LAS, OHX02LAP, OHX02LAA, OHX02PCD, OHX02PCS, OHX02PCP, OHX02PCA);
@@ -542,6 +541,11 @@ disab_bit_all='disability bitter taste, Tongue Tip or whole mouth, 1: yes, 0:no'
 ;
 
 run;
+
+proc freq data =  peri_all;
+table peri_g2;
+run;
+
 /**
 there are 354 msising for all tooth count (where denti with 354 mising)
 however, there are 611 misisng for peri-test 
@@ -836,7 +840,7 @@ run;
 /*Medications analysis*/
 
 proc freq data=pt_3 order=freq;
-tables RXDDRUG;
+tables peri_g2;
 run;
 
 
