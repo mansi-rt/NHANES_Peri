@@ -2,39 +2,23 @@
 use NHANES 2013-2014 data
 Assign a permanent library to the folder where you want to save the .sas7bdat files 
 
-## data set with peri status (peri_g2, peri_stage
-
- permdata.peri_taste_all_250102
- permdata.peri_taste_n2155_250102
-
-*/
-
-libname permdata 'T:\LinHY_project\NHANES\oral_health\data';
-
-data demo;
-set permdata.demo_h;
-run;
-
-data ohxper;
-set permdata.ohxper_h;
-run;
-/**** Experimenting and cretaing the periodontitis variable just for tooth 2M *************/
-/* Creating a new dataset with the periodontitis variable */
-
 /*
 LinHY, 12/21/2024
 From PI
 PERIODONTITIS is defined based on following criteria for ATTACHMENT LOSS, PROBING DEPTH:
-•	Attachment loss of 1 mm or more on at least 2 teeth (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML) with PD (pocket depth) 4 mm or 
-•	more on at least 2 teeth (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML)) is defined as periodontitis. 
-•	Otherwise defined as no periodontitis (0 mm attachment loss on all teeth or less than 2 teeth have more than 0 mm attachment loss). 
-•	Attachment loss and probing depth is measured on six surfaces (DF, MDF, MF, DL, MDL, ML) per tooth. 
+â€¢	Attachment loss of 1 mm or more on at least 2 teeth (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML) with PD (pocket depth) 4 mm or 
+â€¢	more on at least 2 teeth (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML)) is defined as periodontitis. 
+â€¢	Otherwise defined as no periodontitis (0 mm attachment loss on all teeth or less than 2 teeth have more than 0 mm attachment loss). 
+â€¢	Attachment loss and probing depth is measured on six surfaces (DF, MDF, MF, DL, MDL, ML) per tooth. 
 
 NHANES peri questions are for age >=30
 */
 
 /** LinHY, set up missing **/; 
 
+libname permdata 'T:\LinHY_project\NHANES\oral_health\data';
+
+/**********************************  MACROS *******************************/
 %macro Vrecode(var,cutp,nvar);
      if &var.=. or &var.=99 then &nvar.=.;
 	 else if &var. >= &cutp. then &nvar.=1;
@@ -64,220 +48,15 @@ NHANES peri questions are for age >=30
 %mend rename_1t;
 
 
-data periodontitis_2m;
-    set permdata.ohxper_h;
-
-
-    /* Checking the condition for periodontitis based on attachment loss and probing depth */
-    /* Attachment loss on DF, MF, DL, or ML surfaces */
-	/* Probing depth on DF, MF, DL, or ML surfaces */
-
-
-/**define missing & rename  variables */
- %rename_1t(02, OHX02LAD, OHX02LAS, OHX02LAP, OHX02LAA, OHX02PCD, OHX02PCS, OHX02PCP, OHX02PCA);
-
-
-%vrecode(OHX02LAD, 1, LOA_DF_ge1);
-%vrecode(OHX02LAS, 1, LOA_MF_ge1);
-%vrecode(OHX02LAP, 1, LOA_DL_ge1);
-%vrecode(OHX02LAA, 1, LOA_ML_ge1);
-
-%vrecode(OHX02PCD, 4, PD_DF_ge4);
-%vrecode(OHX02PCS, 4, PD_MF_ge4);
-%vrecode(OHX02PCP, 4, PD_DL_ge4);
-%vrecode(OHX02PCA, 4, PD_ML_ge4);
-
-
-if LOA_DF_ge1=1 or LOA_MF_ge1=1 or LOA_DL_ge1=1 or LOA_ML_ge1=1 then LOA_4s_ge1=1;
-else if LOA_DF_ge1=0 and LOA_MF_ge1=0 and LOA_DL_ge1=0 and LOA_ML_ge1=0 then LOA_4s_ge1=0;
-else LOA_4s_ge1=.;
-
-if PD_DF_ge4=1 or PD_MF_ge4=1 or PD_DL_ge4=1 or PD_ML_ge4=1 then PD_4s_ge4=1;
-else if PD_DF_ge4=0 and PD_MF_ge4=0 and PD_DL_ge4=0 and PD_ML_ge4=0 then PD_4s_ge4=0;
-else PD_4s_ge4=.;
-
-
-if  LOA_4s_ge1=. or  PD_4s_ge4=. then peri_2m=.;
-else if LOA_4s_ge1=1 and PD_4s_ge4=1 then peri_2m=1;
-else peri_2m=0;
-
-*/;
-
-if LOA_DF=. and LOA_MF=. and LOA_DL=. and LOA_ML=. then LOA_4s_gt1=.;
-else if LOA_DF>=1 or LOA_MF>=1 or LOA_DL>=1 or LOA_ML >=1 then LOA_4s_gt1=1;
-else LOA_4s_gt1=0;
-
-if LOA_DF=. and LOA_MF=. and LOA_DL=. and LOA_ML=. and LOA_PD_DF=. and LOA_PD_MF=. and LOA_PD_DL=. and LOA_PD_ML=. then peri_2m=.;
-else if (LOA_DF>=1 or LOA_MF>=1 or LOA_DL>=1 or LOA_ML >=1) and (LOA_PD_DF>=4 or LOA_PD_MF>=4 or LOA_PD_DL>=4 or LOA_PD_ML>=4) then peri_2m=1;
-else peri_2m=0;
-
-*/;
-    if 
-        (OHX02LAD >= 1 or OHX02LAS >= 1 or OHX02LAP >= 1 or OHX02LAA >= 1) 
-        and
-        (OHX02PCD >= 4 or OHX02PCS >= 4 or OHX02PCP >= 4 or OHX02PCA >= 4) 
-    then periodontitis_2m = "Yes";
-	    
-    else periodontitis_2m = "No";
-
-
-	label 
-  OHDEXSTS='Overall Oral Health Exam Status, 1:Complete, 2:	Partial, 3:	Not done'
-  OHDPDSTS='Periodontal Status Code, 1:Complete, 2:	Partial, 3:	Not done'
-
-OHX02LAD='LOA: Max R(2M) DF calculated AL(mm), Loss of Attachment: Upper right 2nd molar (2M) distal - Calculation of : (FGM to CEJ measurement) - (FGM to sulcus base measurement) (mm)'
-OHX02LAS='LOA: Max R(2M) MF calculated AL(mm)'
-OHX02LAP='LOA: Max R(2M) DL calculated AL(mm)'
-OHX02LAA='LOA: Max R(2M) ML calculated AL(mm)'
-
-OHX02PCD='LOA: Max R(2M) DF FGM-sulcus(mm), pocket depth'
-OHX02PCS='LOA: Max R(2M) MF FGM-sulcus(mm), pocket depth'
-OHX02PCP='LOA: Max R(2M) DL FGM-sulcus(mm), pocket depth'
-OHX02PCA='LOA: Max R(2M) ML FGM-sulcus(mm), pocket depth'
-
-LOA_DF_ge1='LOA: Max R(2M) DF calculated AL(mm), 1:>=1, 0:else'
-LOA_MF_ge1='LOA: Max R(2M) MF calculated AL(mm), 1:>=1, 0:else'
- LOA_DL_ge1='LOA: Max R(2M) DL calculated AL(mm), 1:>=1, 0:else'
-LOA_ML_ge1='LOA: Max R(2M) ML calculated AL(mm), 1:>=1, 0:else'
-
-PD_DF_ge4='LOA: Max R(2M) DF FGM-sulcus(mm), pocket depth, 1:>=4, 0:else'
-PD_MF_ge4='LOA: Max R(2M) MF FGM-sulcus(mm), pocket depth, 1:>=4, 0:else'
-PD_DL_ge4='LOA: Max R(2M) DL FGM-sulcus(mm), pocket depth, 1:>=4, 0:else'
-PD_ML_ge4='LOA: Max R(2M) ML FGM-sulcus(mm), pocket depth, 1:>=4, 0:else'
-
- LOA_4s_ge1='Attachment loss, >=1 mm on at least 2 teeth (even 1 surface for surface DF, MF, DL and ML, 1: yes, 0:no'
-
-;
-
-run;
-
-/* Running proc freq to check the frequency of the new periodontitis variable */
-
-
-proc freq data=periodontitis_2m;
- *table OHX02LAD  LOA_DF_ge1 OHX02LAS LOA_MF_ge1 OHX02LAP LOA_DL_ge1 OHX02LAA LOA_ML_ge1;
- *table OHX02PCD PD_DF_ge4 OHX02PCS PD_MF_ge4 OHX02PCP PD_DL_ge4 OHX02PCA PD_ML_ge4;
- table peri_2m;
- 
- run;
-
-proc freq data=periodontitis_2m;
- *table OHX02LAD LOA_DF;
-* table OHDEXSTS OHDPDSTS;
- *table OHX02LAD OHX02LAS;
- *   tables periodontitis_2m ;
- *table periodontitis_2m;
- *table  OHDPDSTS;
- *table PD_4s_ge4;
- *table OHX02LAD LOA_DF_02 LOA_DF_ge1;
- table OHX02LAA  LOA_ML_02 LOA_ML_ge1;
- *table OHX02PCA PD_ML_02 PD_ML_ge4;
-run;
-/** check LOA*/
-proc freq data=periodontitis_2m;
- where LOA_4s_ge1=1;
- table LOA_DF_ge1* LOA_MF_ge1*  LOA_DL_ge1* LOA_ML_ge1 LOA_4s_ge1/list missing;
-run;
-
-proc freq data=periodontitis_2m;
- *table  LOA_DF LOA_MF  LOA_DL LOA_ML LOA_4s_ge1;
- table LOA_4s_ge1;
- run;
-/** check PD*/
- proc freq data=periodontitis_2m;
- table PD_4s_ge4;
- run;
-
-proc freq data=periodontitis_2m;
- where PD_4s_ge4=1;
- table PD_DF_ge4* PD_MF_ge4* PD_DL_ge4 * PD_ML_ge4 PD_4s_ge4 /list missing;
-
-run;
-
-
- proc freq data=periodontitis_2m;
- table peri_2m LOA_4s_ge1*PD_4s_ge4 /missing ;
- run;
-
-
-
-/*
-                                                     Cumulative    Cumulative
-                LOA_4s_gt1    Frequency     Percent     Frequency      Percent
-                ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ
-                         0           1        0.04             1         0.04
-                         1        2627       99.96          2628       100.00
-
-                                    Frequency Missing = 2041
-
-
-                                                       Cumulative    Cumulative
-                 PD_4s_ge4    Frequency     Percent     Frequency      Percent
-                 ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ
-                         0        2177       83.80          2177        83.80
-                         1         421       16.20          2598       100.00
-
-                                    Frequency Missing = 2071
-
-*/
-
-proc print data=periodontitis_2m;
- where LOA_4s_ge1=.;
- var LOA_DF LOA_MF  LOA_DL LOA_ML LOA_4s_ge1;
- run;
-
-/* Creating the periodontitis stage variable using the periodontitis_2m dataset */
-data periodontitis_stage_2m;
-    set periodontitis_2m;
-
-    /* Initializing the periodontitis stage variable to missing */
-    periodontitis_stage_2m = .;
-
-
-    /* Assigning stages only to participants who have periodontitis */
-    if periodontitis_2m = "Yes" then do;
-
-        /* Checking for Stage 1: Attachment loss of 1-2 mm on any DF, MF, DL, or ML surface */
-        if (OHX02LAD >= 1 and OHX02LAD <= 2) or 
-           (OHX02LAS >= 1 and OHX02LAS <= 2) or 
-           (OHX02LAP >= 1 and OHX02LAP <= 2) or 
-           (OHX02LAA >= 1 and OHX02LAA <= 2) then periodontitis_stage_2m = 1;
-
-        /* Checking for Stage 2: Attachment loss of 3-4 mm on any DF, MF, DL, or ML surface */
-        if (OHX02LAD >= 3 and OHX02LAD <= 4) or 
-           (OHX02LAS >= 3 and OHX02LAS <= 4) or 
-           (OHX02LAP >= 3 and OHX02LAP <= 4) or 
-           (OHX02LAA >= 3 and OHX02LAA <= 4) then periodontitis_stage_2m = 2;
-
-        /* Checking for Stage 3: Attachment loss of 5 mm or more on any DF, MF, DL, or ML surface */
-        if (OHX02LAD >= 5) or 
-           (OHX02LAS >= 5) or 
-           (OHX02LAP >= 5) or 
-           (OHX02LAA >= 5) then periodontitis_stage_2m = 3;
-
-        /* Checking for Stage 4: Less than 20 remaining teeth (condition needs to be checked separately) */
-        /*else periodontitis_stage_2m = 4; Need the tooth loss dataset for Stage 4*/
-    end;
-
-run;
-
-/* Running proc freq to check the distribution of the new periodontitis stage variable */
-proc freq data=periodontitis_stage_2m;
-    tables periodontitis_stage_2m;
-run;
 /******** Actually performing the analysis on all teeth ****/
 /* Macro for creating periodontitis for individual teeth */
-
-  /* Creating a periodontitis variable for the specific tooth 
+/* Creating a periodontitis variable for the specific tooth 
 	Adding the missing variable value */
 
 /** 12/23/2024, LinHY 
-
 A tooth that follows both of the following 2 criteria will be considered a PERIODONTITIS symptom for this tooth. Is this correct? 
-   (1)                 At least 1 out of the 4 surfaces (DF, MF, DL, and ML) with attachment loss >= 1 mm
-       AND 
-    (2)                At least 1 out of the 4 surfaces (DF, MF, DL, and ML) with PD >= 4 mm
-
+1. At least 1 out of the 4 surfaces (DF, MF, DL, and ML) with attachment loss >= 1 mm
+2.  At least 1 out of the 4 surfaces (DF, MF, DL, and ML) with PD >= 4 mm
 for a missing tooth, the LOA and PD statuses were treated as 0 
 ***/; 
 
@@ -309,50 +88,17 @@ else if t&tooth.=1 then do;
 	else PD_4s_ge4_&tooth.=.;
 end;
 
-/*
-	if LOA_DF_ge1_&tooth.=1 or LOA_MF_ge1_&tooth.=1 or LOA_DL_ge1_&tooth.=1 or LOA_ML_ge1_&tooth.=1 then LOA_4s_ge1_&tooth.=1;
-else if LOA_DF_ge1_&tooth.=0 and LOA_MF_ge1_&tooth.=0 and LOA_DL_ge1_&tooth.=0 and LOA_ML_ge1_&tooth.=0 then LOA_4s_ge1_&tooth.=0;
-else LOA_4s_ge1_&tooth.=.;
-
-if PD_DF_ge4_&tooth.=1 or PD_MF_ge4_&tooth.=1 or PD_DL_ge4_&tooth.=1 or PD_ML_ge4_&tooth.=1 then PD_4s_ge4_&tooth.=1;
-else if PD_DF_ge4_&tooth.=0 and PD_MF_ge4_&tooth.=0 and PD_DL_ge4_&tooth.=0 and PD_ML_ge4_&tooth.=0 then PD_4s_ge4_&tooth.=0;
-else PD_4s_ge4_&tooth.=.;
-*/;
-
 if  LOA_4s_ge1_&tooth.=. or  PD_4s_ge4_&tooth.=. then peri_t&tooth.=.;
 else if LOA_4s_ge1_&tooth.=1 and PD_4s_ge4_&tooth.=1 then peri_t&tooth.=1;
 else peri_t&tooth.=0;
 
 %mend peri_1t;
 
-
-
-
 /** count missing for the peri status of each tooth*/
 %macro miss_ct(var);
   if &var.= . then &var._mis=1;
   else  &var._mis=0; 
 %mend miss_ct;
-
-
-
-/* MT version 
-%macro create_periodontitis(tooth, df_al, mf_al, dl_al, ml_al, df_pd, mf_pd, dl_pd, ml_pd);
-
-  
-    if (&df_al >= 1 or &mf_al >= 1 or &dl_al >= 1 or &ml_al >= 1) 
-        and
-       (&df_pd >= 4 or &mf_pd >= 4 or &dl_pd >= 4 or &ml_pd >= 4) 
-    then periodontitis_&tooth = 1;
-	else if (&df_al = . & &mf_al = . & &dl_al = . & &ml_al = .)
-        and
-       (&df_pd = . & &mf_pd = . & &dl_pd = . & &ml_pd = .) 
-    then periodontitis_&tooth = .;
-    else periodontitis_&tooth = 0;
-
-%mend;
-*/
-
 
 proc sort data=permdata.ohxper_h;
  by SEQN;
@@ -398,7 +144,7 @@ proc freq data=peri_all_teeth;
 
                                                       Cumulative    Cumulative
                   peri_g2    Frequency     Percent     Frequency      Percent
-                  ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ
+                  Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’Æ’
                         0         844       46.81           844        46.81
                         1         959       53.19          1803       100.00
 
@@ -443,20 +189,12 @@ proc freq data=peri_all_teeth;
    else t&tooth.=0;
 %mend t_count;
 
-
-
-data periodontitis_all_teeth;
 data peri_all;
     set merging_per_den;
-
-
 rename RIDAGEYR=age;
-
 	if OHDPDSTS=.  then peri_test=.;
 	else if OHDPDSTS=1 or OHDPDSTS=2 then peri_test=1;
 	else if OHDPDSTS=3 then peri_test=0;
-
-
 	if OHDDESTS=.  then denti=.;
 	else if OHDDESTS=1 or OHDDESTS=2 then denti=1;
 	else if OHDDESTS=3 then denti=0;
@@ -509,13 +247,6 @@ remaining_teeth_p28= t02+ t03 + t04+ t05+ t06+ t07 + t08 +t09+ t10+
     /** NHANES only had peri data for 28 teeth, 
 # from PI: Usually 3rd molars are excluded (#1,16,17,32) since it is missing for most people or out of position. 
 ****/;
-
-/* rename and define missing 
-OHX02LAD -> LOA_DF_02
-OHX02LAS-> LOA_MF_02
-OHX02LAP -> LOA_DL_02
-OHX02LAA -> LOA_ML_02
-***/;
 
    %rename_1t(02, OHX02LAD, OHX02LAS, OHX02LAP, OHX02LAA, OHX02PCD, OHX02PCS, OHX02PCP, OHX02PCA);
    %rename_1t(03, OHX03LAD, OHX03LAS, OHX03LAP, OHX03LAA, OHX03PCD, OHX03PCS, OHX03PCP, OHX03PCA);
@@ -661,9 +392,8 @@ peri_total_mis =
     peri_t28_mis + peri_t29_mis + peri_t30_mis + peri_t31_mis;
 
 
-
 /*
-	# Step 1 (peri for a tootoh):
+# Step 1 (peri for a tootoh):
 A tooth that follows both of the following 2 criteria will be considered a PERIODONTITIS symptom for this tooth.     
    (1)At least 1 out of the 4 surfaces (DF, MF, DL, and ML) with attachment loss >= 1 mm
        AND 
@@ -676,38 +406,6 @@ At least 2 teeth with peri -> peri
 if peri_total_any>=2 then peri_g2=1;
 else if peri_total_all=1 or peri_total_all=0 or (peri_total_any=0 and peri_total_mis=1) then peri_g2=0;
 else peri_g2=.;
-
-
-
-	/* Summing across all teeth to check if at least two teeth meet the periodontitis criteria */
-	/*
-total_teeth_with_periodontitis = 
-    sum(peri_t02, peri_t03, peri_t04, peri_t05, 
-    peri_t06, peri_t07, peri_t08, peri_t09, 
-    peri_t10, peri_t11, peri_t12, peri_t13, 
-    peri_t14, peri_t15, peri_t18, peri_t19, 
-    peri_t20, peri_t21, peri_t22, peri_t23, 
-    peri_t24, peri_t25, peri_t26, peri_t27, 
-    peri_t28, peri_t29, peri_t30, peri_t31);
-	*/
-   /*
-	total_teeth_with_periodontitis = 
-    sum(periodontitis_02, periodontitis_03, periodontitis_04, periodontitis_05, 
-    periodontitis_06, periodontitis_07, periodontitis_08, periodontitis_09, 
-    periodontitis_10, periodontitis_11, periodontitis_12, periodontitis_13, 
-    periodontitis_14, periodontitis_15, periodontitis_18, periodontitis_19, 
-    periodontitis_20, periodontitis_21, periodontitis_22, periodontitis_23, 
-    periodontitis_24, periodontitis_25, periodontitis_26, periodontitis_27, 
-    periodontitis_28, periodontitis_29, periodontitis_30, periodontitis_31);
-	*/
-
-/* Checking if periodontitis is present based on at least two teeth having periodontitis 
-	Adding the missing variable value */
-/*
-    if total_teeth_with_periodontitis >= 2 then periodontitis_overall = "Yes";
-    else if missing(total_teeth_with_periodontitis) then call missing(periodontitis_overall);
-    else periodontitis_overall = "No";
-*/;
 
 /****************
 define stage 
@@ -776,14 +474,6 @@ Ask? Stage 4:attachment loss of 5 or >5 mm?
 	end;
    else peri_stage=.;
 
-   /*
-    if remaining_teeth < 20 then periodontitis_stage_max = 4;
-    else periodontitis_stage_max = max(of periodontitis_stage_02-periodontitis_stage_31);
-
- */
-
- 
-
 /******************** 
  taste variables 
    *****************/
@@ -816,16 +506,6 @@ Ask? Stage 4:attachment loss of 5 or >5 mm?
 	if disab_bit_wm=. or disab_bit_tp=. then disab_bit_all=.;
 	else if disab_bit_wm=1 or disab_bit_tp=1 then disab_bit_all=1;
 	else disab_bit_all=0;
-
-	/*
-    if disability_bitter_whole = 'Yes' or disability_bitter_tip = 'Yes' then disability_bitter = 'Yes'; 
-    else if disability_bitter_whole = 'No' and disability_bitter_tip = 'No' then disability_bitter = 'No';
-
-    if disability_salty_whole = 'Yes' or disability_salty_tip = 'Yes' then disability_salty = 'Yes'; 
-    else if disability_salty_whole = 'No' and disability_salty_whole = 'No' then disability_salty = 'No';
-*/
-
-
 
 label 
 	peri_total_all='teeth count of peri for all 28 teeth, missing: any missing' 
@@ -875,47 +555,8 @@ proc means data=peri_all;
 
 
 proc freq data=peri_all;
- *where peri_g2=1;
  table peri_test *peri_g2/missing;
- *table peri_g2 peri_stage;
  table periodontitis_stage_max* t_ls20/missing;
- *table denti;
- *table remaining_teeth_p28;
- *table OHDPDSTS peri_test OHDDESTS denti;
- *table peri_test * peri_g2/missing;
- *table OHX02TC t02 OHX03TC t03;
-* table t02 peri_t02;
- *table peri_g2 peri_stage;
- *table peri_t02* t02/misssing;
- *table peri_g2 *(peri_stage periodontitis_stage_max)/missing ;
- *table peri_g2 * peri_test/missing;
- *table denti;
- *table t01 t02 t03 t04 t05 
-    t06 t07 t08 t09 
-    t10 t11 t12 t13 
-    t14 t15 t18 t19 
-    t20 t21 t22 t23 
-    t24 t25 t26 t27 
-    t28 t29 t30 t31 t32;
-run;
-
-proc print data=peri_all;
- where  peri_g2=0 and peri_test=0;
- *var peri_t02 peri_t03 peri_t04 peri_t05 
-    peri_t06 peri_t07 peri_t08 peri_t09 
-    peri_t10 peri_t11 peri_t12 peri_t13 
-    peri_t14 peri_t15 peri_t18 peri_t19 
-    peri_t20 peri_t21 peri_t22 peri_t23 
-    peri_t24 peri_t25 peri_t26 peri_t27 
-    peri_t28 peri_t29 peri_t30 peri_t31 peri_g2 peri_test;
-
-var t02 t03 t04 t05 
-    t06 t07 t08 t09 
-    t10 t11 t12 t13 
-    t14 t15 t18 t19 
-    t20 t21 t22 t23 
-    t24 t25 t26 t27 
-    t28 t29 t30 t31 remaining_teeth peri_g2 peri_test;
 run;
 
 proc freq data=peri_all;
@@ -935,51 +576,29 @@ proc freq data=peri_all;
  run;
 
 proc means data=peri_all n mean median std min max maxdec=2;
- *var age;
  var remaining_teeth peri_total_mis;
  run;
 
 proc freq data=peri_all;
  table peri_g2 peri_stage;
  run;
-/** check peri status by missing tooth */
-proc print data=peri_all (obs=40);
- where t02=0;
- * where t02=1 and LOA_4s_ge1_02=0;
- var LOA_DF_02 LOA_MF_02 LOA_DL_02 LOA_ML_02 t02 LOA_4s_ge1_02;
- run;
-
- proc print data=peri_all (obs=40);
- where t02=1;
- * where t02=1 and PD_4s_ge1_02=0;
- var PD_DF_02 PD_MF_02 PD_DL_02 PD_ML_02 t02 PD_4s_ge4_02;
- run;
 
 proc freq data=peri_all;
  where t02=1;
- *table LOA_4s_ge1_02;
   table LOA_DF_02 *LOA_MF_02* LOA_DL_02* LOA_ML_02 LOA_4s_ge1_02 /list missing ;
  run;
 
 proc freq data=peri_all;
  where t02=1;
- *table PD_4s_ge1_02;
   table PD_DF_02 *PD_MF_02* PD_DL_02* PD_ML_02 PD_4s_ge4_02 /list missing ;
  run;
 
 proc freq data=peri_all;
  where t03=1;
- *table LOA_4s_ge1_03;
   table LOA_DF_03 *LOA_MF_03* LOA_DL_03* LOA_ML_03 LOA_4s_ge1_03 /list missing ;
  run;
-proc print data=peri_all (obs=40);
- where peri_test=1;
- var peri_t02 t02;
- run;
-
 
 proc freq data=peri_all;
- *where peri_test=1;
  table peri_t02* t02/missing;
  table peri_t03* t03/missing;
  run;
@@ -1016,33 +635,6 @@ proc means data=pt;
  var age;
  run;
 
-proc freq data=pt;
- table remaining_teeth_p28;
- run;
-
-
-proc print data=pt (obs=20);
- var t01 t02 t03 t04 t05 
-    t06 t07 t08 t09 
-    t10 t11 t12 t13 
-    t14 t15 t16 t17 t18 t19 
-    t20 t21 t22 t23 
-    t24 t25 t26 t27 
-    t28 t29 t30 t31 t31 remaining_teeth peri_g2 peri_test;
-	run;
-
-proc print data=pt;
- where  peri_g2=0 and peri_test=0;
-
-var t02 t03 t04 t05 
-    t06 t07 t08 t09 
-    t10 t11 t12 t13 
-    t14 t15 t18 t19 
-    t20 t21 t22 t23 
-    t24 t25 t26 t27 
-    t28 t29 t30 t31  peri_g2 peri_test;
-run;
-
 proc means data=pt;
  where  peri_g2=0 and peri_test=0;
  var remaining_teeth;
@@ -1064,96 +656,6 @@ run;
 proc freq data=pt;
     tables (peri_g2 peri_stage age) * disab_salty_all / chisq norow nocol nopercent;
     title "Table for disab_salty_all (Salty)";
-run;
-
-/* ALL OUTPUT IN ONE TABLE */
-/* Table for disab_bit_all (Bitter Yes/No) */
-proc tabulate data=pt format=8.2;
-    class disab_bit_all peri_g2 peri_stage;
-    var age;
-
-    /* Table for categorical variables */
-    table 
-        (peri_g2='Periodontitis (Yes/No)' 
-         peri_stage='Periodontitis Stage') /* Rows */
-        ,
-        disab_bit_all='Bitter (Yes/No)' * (n='Count' rowpctn='Row %') /* Columns */
-        / box='Categorical Variables for Bitter';
-
-    /* Table for mean age */
-    table 
-        age='Mean Age'*mean 
-        ,
-        disab_bit_all='Bitter (Yes/No)' 
-        / box='Mean Age for Bitter';
-    title "Summary Table for disab_bit_all (Bitter Yes/No)";
-run;
-
-/* Table for disab_salty_all (Salty Yes/No) */
-proc tabulate data=pt format=8.2;
-    class disab_salty_all peri_g2 peri_stage;
-    var age;
-
-    /* Table for categorical variables */
-    table 
-        (peri_g2='Periodontitis (Yes/No)' 
-         peri_stage='Periodontitis Stage') /* Rows */
-        ,
-        disab_salty_all='Salty (Yes/No)' * (n='Count' rowpctn='Row %') /* Columns */
-        / box='Categorical Variables for Salty';
-
-    /* Table for mean age */
-    table 
-        age='Mean Age'*mean 
-        ,
-        disab_salty_all='Salty (Yes/No)' 
-        / box='Mean Age for Salty';
-    title "Summary Table for disab_salty_all (Salty Yes/No)";
-run;
-
-/* TABLES INCLUDING MISSING */
-/* Table for disab_bit_all (Bitter Yes/No) */
-proc tabulate data=pt format=8.2 missing;
-    class disab_bit_all peri_g2 peri_stage;
-    var age;
-
-    /* Table for categorical variables */
-    table 
-        (peri_g2='Periodontitis (Yes/No)' 
-         peri_stage='Periodontitis Stage') /* Rows */
-        ,
-        disab_bit_all='Bitter (Yes/No)' * (n='Count' rowpctn='Row %') * all /* Columns, including missing */
-        / box='Categorical Variables for Bitter';
-
-    /* Table for mean age */
-    table 
-        age='Mean Age'*mean 
-        ,
-        disab_bit_all='Bitter (Yes/No)' * all /* Include missing values for disab_bit_all */
-        / box='Mean Age for Bitter';
-    title "Summary Table for disab_bit_all (Bitter Yes/No)";
-run;
-
-/* Table for disab_salty_all (Salty Yes/No) */
-proc tabulate data=pt format=8.2 missing;
-    class disab_salty_all peri_g2 peri_stage;
-    var age;
-
-    /* Table for categorical variables */
-    table 
-        (peri_g2='Periodontitis (Yes/No)' 
-         peri_stage='Periodontitis Stage') /* Rows */
-        ,
-        disab_salty_all='Salty (Yes/No)' * (n='Count' rowpctn='Row %') * all /* Columns, including missing */
-        / box='Categorical Variables for Salty';
-
-    /* Table for mean age */
-    table 
-        age='Mean Age'*mean 
-        ,
-        disab_salty_all='Salty (Yes/No)' * all /* Include missing values for disab_salty_all */
-        / box='Mean Age for Salty';
-    title "Summary Table for disab_salty_all (Salty Yes/No)";
 run;
 
 /*******Frequency tables for secondary predictors! ******/
@@ -1268,85 +770,6 @@ proc freq data=pt_2;
     tables ALQ101*ALQ151 / chisq norow nocol nopercent;
 run;
 
-/**/ 
-/* IGNORE CODE -----
-/*/* Merge PT2 with new datasets: CSQ_H (xerostomia), OHQ_H (dental health), RXQ_RX_H (medications) */*/
-/*data pt_3;*/
-/*    merge pt_2(in=a) permdata.csq_h(in=b) permdata.ohq_h(in=c) permdata.rxq_rx_h(in=d);*/
-/*    by SEQN;*/
-/*    if a; /* Keep only those in pt_2 */*/
-/**/
-/*    /* Xerostomia (Dry Mouth) */*/
-/*    length Xerostomia $15;*/
-/*    if CSQ240 = 1 then Xerostomia = 'Yes';*/
-/*    else if CSQ240 = 2 then Xerostomia = 'No';*/
-/*    else Xerostomia = '';*/
-/**/
-/*    length Frequent_Dry_Mouth $15;*/
-/*    if CSQ250 = 1 then Frequent_Dry_Mouth = 'Yes';*/
-/*    else if CSQ250 = 2 then Frequent_Dry_Mouth = 'No';*/
-/*    else Frequent_Dry_Mouth = '';*/
-/**/
-/*    /* Dental Caries & Gum Disease */*/
-/*    length Cavities_Ever $15;*/
-/*    if OHQ845 = 1 then Cavities_Ever = 'Yes';*/
-/*    else if OHQ845 = 2 then Cavities_Ever = 'No';*/
-/*    else Cavities_Ever = '';*/
-/**/
-/*    length Treated_Cavities $15;*/
-/*    if OHQ850 = 1 then Treated_Cavities = 'Yes';*/
-/*    else if OHQ850 = 2 then Treated_Cavities = 'No';*/
-/*    else Treated_Cavities = '';*/
-/**/
-/*    length Gum_Disease $15;*/
-/*    if OHQ855 = 1 then Gum_Disease = 'Yes';*/
-/*    else if OHQ855 = 2 then Gum_Disease = 'No';*/
-/*    else Gum_Disease = '';*/
-/**/
-/*    length Gum_Disease_Treatment $15;*/
-/*    if OHQ860 = 1 then Gum_Disease_Treatment = 'Yes';*/
-/*    else if OHQ860 = 2 then Gum_Disease_Treatment = 'No';*/
-/*    else Gum_Disease_Treatment = '';*/
-/**/
-/*    length Lost_All_Teeth $15;*/
-/*    if OHQ870 = 1 then Lost_All_Teeth = 'Yes';*/
-/*    else if OHQ870 = 2 then Lost_All_Teeth = 'No';*/
-/*    else Lost_All_Teeth = '';*/
-/**/
-/*    length Dentures $15;*/
-/*    if OHQ875 = 1 then Dentures = 'Yes';*/
-/*    else if OHQ875 = 2 then Dentures = 'No';*/
-/*    else Dentures = '';*/
-/**/
-/*    /* Missing Teeth (based on previous OHX variables) */*/
-/*    length Missing_Teeth_Category $15;*/
-/*    if remaining_teeth_p28 >= 25 then Missing_Teeth_Category = 'Few Missing';*/
-/*    else if remaining_teeth_p28 >= 15 then Missing_Teeth_Category = 'Moderate Missing';*/
-/*    else if remaining_teeth_p28 > 0 then Missing_Teeth_Category = 'Severe Missing';*/
-/*    else if remaining_teeth_p28 = 0 then Missing_Teeth_Category = 'Edentulous';*/
-/*    else Missing_Teeth_Category = '';*/
-/**/
-/*    /* Medications Related to Dry Mouth */*/
-/*    length Meds_Dry_Mouth $20;*/
-/*    Meds_Dry_Mouth = 'No'; /* Default to No */*/
-/**/
-/*    if RXDDRGID in (*/
-/*        /* Antihistamines */*/
-/*        'LORATADINE', 'CETIRIZINE', 'DIPHENHYDRAMINE', 'FEXOFENADINE',*/
-/*        /* Decongestants */*/
-/*        'PSEUDOEPHEDRINE', 'PHENYLEPHRINE',*/
-/*        /* Antidepressants */*/
-/*        'FLUOXETINE', 'SERTRALINE', 'CITALOPRAM', 'ESCITALOPRAM', 'PAROXETINE',*/
-/*        /* Antipsychotics */*/
-/*        'RISPERIDONE', 'OLANZAPINE', 'QUETIAPINE',*/
-/*        /* Antihypertensives */*/
-/*        'LISINOPRIL', 'ENALAPRIL', 'RAMIPRIL', 'LOSARTAN', 'HYDROCHLOROTHIAZIDE',*/
-/*        /* Anticholinergics */*/
-/*        'OXYBUTYNIN', 'TOLTERODINE', 'DARIFENACIN'*/
-/*    ) then Meds_Dry_Mouth = 'Yes';*/
-/**/
-/*run;
-
 /* Merge Additional Datasets for Dental and Medication Variables */
 
 data pt_3;
@@ -1420,195 +843,3 @@ run;
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*OLD FREQUENCY PROCEDURES USED TO CHECK AND CREATE TABLES DURING HOLIDAYS BY DR. LIN*/
-/**/
-/*/****/
-/*data permdata.peri_taste_all_250102;*/
-/* set peri_all;*/
-/*run;*/
-/**/
-/*data permdata.peri_taste_n2155_250102;*/
-/* set pt;*/
-/*run;*/
-/******/;*/
-/**/
-/*proc freq data=pt;*/
-/* *table peri_g2* (disab_salty_all disab_bit_all)/chisq;*/
-/* *table peri_g2* (disab_salty_tp disab_bit_tp)/chisq;*/
-/* * table peri_g2* (disab_salty_wm disab_bit_wm)/chisq;*/
-/* run;*/
-/**/
-/*/* peri_stage vs. disab_salty_all, p=0.0066*/
-/*           vs. disab_salty_tp, p=0.0199*/
-/* ***/;*/
-/*proc freq data=pt;*/
-/* *table peri_stage* (disab_salty_all disab_bit_all)/chisq;*/
-/* *table peri_stage* (disab_salty_tp disab_bit_tp)/chisq;*/
-/*  table peri_stage* (disab_salty_wm disab_bit_wm)/chisq fisher;*/
-/* run;*/
-/**/
-/*/**/
-/*project outline */
-/**/
-/*Eligibility: */
-/*  Age >=40  years */
-/**/
-/* peri var(age >=30), Dentition (age, 1-150), taste (age >=40)*/
-/**/
-/*Outcome: */
-/*   Taste grade (bitter and salty) and disability*/
-/*  Tongue tip taste test grading and disability (salt and bitter), whole mouth taste test grading and disability (salt and bitter)*/
-/**/
-/*Primary predictor:*/
-/*            Periodontitis (yes/no, severity)*/
-/**/
-/*Covariates: Sex, age, educational level, poverty index, obesity, diabetes, smoking, xerostomia, dental caries, missing teeth, alcohol consumption (>4 drinks/occasion for women and >5 drinks/occasion for men in the past 30 days), and medications related to mouth dryness (antihistamines, decongestants, antidepressants, antipsychotics, antihypertensives, and anticholinergics).*/
-/**/*/
-/**/
-/**/
-/**/
-/**/
-/**/
-/*proc freq data=peri_all;*/
-/* *table peri_t02 peri_t03 peri_t04 peri_t05 */
-/*    peri_t06 peri_t07 peri_t08 peri_t09 */
-/*    peri_t10 peri_t11 peri_t12 peri_t13 */
-/*    peri_t14 peri_t15 peri_t18 peri_t19 */
-/*    peri_t20 peri_t21 peri_t22 peri_t23 */
-/*    peri_t24 peri_t25 peri_t26 peri_t27 */
-/*    peri_t28 peri_t29 peri_t30 peri_t31;*/
-/* *table peri_t02 peri_t02_mis  peri_t03 peri_t03_mis  peri_t04 peri_t04_mis  peri_t05 peri_t05_mis  peri_t06 peri_t06_mis ;*/
-/* * table peri_try;*/
-/* * table remaining_teeth t_ls20;*/
-/*  *table peri_g2 peri_stage ;*/
-/*  *table CSXNAPT  disab_salty_tp CSXSLTST disab_salty_wm;*/
-/*  *table CSXQUIPT disab_bit_tp  CSXQUIST disab_bit_wm;*/
-/*  *table disab_salty_tp* disab_salty_wm disab_salty_all/missing ;*/
-/*   table disab_bit_tp* disab_bit_wm disab_bit_all/missing ;*/
-/*run;*/
-/**/
-/*proc freq data=peri_all;*/
-/* where  peri_g2=1;*/
-/* table periodontitis_stage_max* t_ls20/missing ;*/
-/* run;*/
-/**/
-/*proc freq data=peri_all;*/
-/* table peri_g2;*/
-/**table peri_g2 peri_g2a;*/
-/**table peri_t02 * peri_t03 *peri_t04 *peri_t05 **/
-/*    peri_t06* peri_t07* peri_t08* peri_t09* */
-/*    peri_t10* peri_t11* peri_t12* peri_t13* */
-/*    peri_t14* peri_t15* peri_t18* peri_t19* */
-/*    peri_t20* peri_t21* peri_t22* peri_t23* */
-/*    peri_t24* peri_t25* peri_t26* peri_t27* */
-/*    peri_t28* peri_t29* peri_t30* peri_t31;*/
-/*run;*/
-/**/
-/*proc freq data=peri_all;*/
-/* where peri_g2=0;*/
-/*table peri_total_all* peri_total_any *peri_total_mis peri_g2 /list missing ;*/
-/* run;*/
-/*/** check 5 teeth first */*/
-/*proc freq  data=periodontitis_all_teeth;*/
-/* *where peri_try=0;*/
-/* table  peri_t02 *peri_t03* peri_t04* peri_t05 * peri_t06 t5_all t5_any peri_try/list missing ;*/
-/* table peri_try;*/
-/*run;*/
-/**/
-/*proc print data=periodontitis_all_teeth (obs=100);*/
-/*  *where peri_try=.;*/
-/* var peri_t02 peri_t03 peri_t04 peri_t05 peri_t06 t5_all t5_any t5_mis peri_try;*/
-/* var */
-/*run;*/
-/**/
-/*proc freq  data=periodontitis_all_teeth;*/
-/* where peri_g2=.;*/
-/*  table peri_total_all peri_total_any peri_g2;*/
-/*  run;*/
-/**/
-/**/
-/*/*** */
-/*12/23/24, LinHY*/
-/*Q: check tooth03 */
-/*A: OK! */
-/****/;*/
-/**/
-/**/
-/*proc freq data=periodontitis_all_teeth;*/
-/* *table OHX03LAD  LOA_DF_ge1_03 OHX03LAS LOA_MF_ge1_03 OHX03LAP LOA_DL_ge1_03 OHX03LAA LOA_ML_ge1_03;*/
-/* *table OHX03PCD PD_DF_ge4_03 OHX03PCS PD_MF_ge4_03 OHX03PCP PD_DL_ge4_03 OHX03PCA PD_ML_ge4_03;*/
-/** table LOA_DF_ge1_03* LOA_MF_ge1_03* LOA_DL_ge1_03 *LOA_ML_ge1_03  LOA_4s_ge1_03/list missing;*/
-/* *table PD_DF_ge4_03* PD_MF_ge4_03* PD_DL_ge4_03 *PD_ML_ge4_03 PD_4s_ge4_03/list missing;*/
-/*  *table LOA_4s_ge1_03*PD_4s_ge4_03 peri_t03/missing;*/
-/*  table LOA_4s_ge1_02*PD_4s_ge4_02 peri_t02/missing;*/
-/* run;*/
-/**/
-/**/
-/**/
-/*/* Running proc freq to check the distribution of the overall periodontitis variable */*/
-/*proc freq data=periodontitis_all_teeth;*/
-/*    tables periodontitis_overall;*/
-/*	tables total_teeth_with_periodontitis;*/
-/*run;*/
-/**/
-/*/* Macro for assigning periodontitis stage for individual teeth */*/
-/*/**/
-/*%macro assign_periodontitis_stage(tooth, df_al, mf_al, dl_al, ml_al);*/
-/**/
-/*    if periodontitis_&tooth = 1 then do;*/
-/**/
-/*        if (&df_al >= 1 and &df_al <= 2) or */
-/*           (&mf_al >= 1 and &mf_al <= 2) or */
-/*           (&dl_al >= 1 and &dl_al <= 2) or */
-/*           (&ml_al >= 1 and &ml_al <= 2) then periodontitis_stage_&tooth = 1;*/
-/**/
-/*        else if (&df_al >= 3 and &df_al <= 4) or */
-/*                (&mf_al >= 3 and &mf_al <= 4) or */
-/*                (&dl_al >= 3 and &dl_al <= 4) or */
-/*                (&ml_al >= 3 and &ml_al <= 4) then periodontitis_stage_&tooth = 2;*/
-/**/
-/*        else if (&df_al >= 5) or */
-/*                (&mf_al >= 5) or */
-/*                (&dl_al >= 5) or */
-/*                (&ml_al >= 5) then periodontitis_stage_&tooth = 3;*/
-/**/
-/*        else call missing(periodontitis_stage_&tooth); */
-/*    end;*/
-/*    else call missing(periodontitis_stage_&tooth); */
-/*%mend;*/
-/**/;*/
-/**/
-/**/
-/*proc print data=peri_all;*/
-/* where denti=1;*/
-/* var OHX02TC OHX03TC OHX04TC OHX05TC OHX06TC OHX07TC OHX08TC */
-/*                          OHX09TC OHX10TC OHX11TC OHX12TC OHX13TC OHX14TC OHX15TC */
-/*                          OHX18TC OHX19TC OHX20TC OHX21TC OHX22TC OHX23TC OHX24TC */
-/*                          OHX25TC OHX26TC OHX27TC OHX28TC OHX29TC OHX30TC OHX31TC miss_teeth_ct;*/
-/*						  run;*/
