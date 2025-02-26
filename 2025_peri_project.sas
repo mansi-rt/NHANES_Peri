@@ -775,9 +775,12 @@ proc freq data=pt_2;
 run;
 
 /* Merge Additional Datasets for Dental and Medication Variables */
-
 data pt_3;
-    merge pt_2(in=a) permdata.csq_h(in=b) permdata.ohq_h(in=c) permdata.ohxper_h(in=d) permdata.rxq_rx_h(in=e);
+    merge pt_2(in=a) 
+          permdata.csq_h(in=b) 
+          permdata.ohq_h(in=c) 
+          permdata.ohxper_h(in=d) 
+          permdata.rxq_rx_h(in=e);
     by SEQN;
     if a; /* Keep only those in pt_2 */
 
@@ -816,6 +819,11 @@ data pt_3;
 
 run;
 
+proc sql;
+    select count(distinct SEQN) as unique_ids_pt2 from pt_2;
+    select count(distinct SEQN) as unique_ids_pt3 from pt_3;
+quit;
+
 /* Frequency Tables for Newly Added Dental and Medication Variables */
 proc freq data=pt_3;
     tables Xerostomia / missing;
@@ -840,7 +848,7 @@ run;
 /*Medications analysis*/
 
 proc freq data=pt_3 order=freq;
-tables peri_g2;
+tables RXDDRUG;
 run;
 
 
