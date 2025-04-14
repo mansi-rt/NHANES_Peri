@@ -526,6 +526,88 @@ There are only 1 person in peri-stage 1.
 However, this person did not have taste variables, so was excluced from the analytical dataset. 
 */
 
+/* SECTION 2a: Trying to recode peri_all with new coding methods*/
+/* Creating recoded dataset with new variables for demographic covariates */
+data peri_all2;
+    set peri_all;
+
+    /* Recoding gender */
+    if RIAGENDR = . then female = .;
+    else if RIAGENDR = 2 then female = 1;
+    else female = 0;
+
+    /* Recoding education */
+    if DMDEDUC2 in (., 7, 9) then edu = .;
+    else if DMDEDUC2 = 1 then edu = 1;
+    else if DMDEDUC2 in (2, 3) then edu = 2;
+    else edu = 3;
+
+    /* Recoding poverty index */
+    if INDFMPIR = . then pirg4 = .;
+    else if INDFMPIR <= 1 then pirg4 = 1;
+    else if INDFMPIR <= 2 then pirg4 = 2;
+    else if INDFMPIR <= 4 then pirg4 = 3;
+    else pirg4 = 4;
+
+    /* Recoding race */
+    if RIDRETH1 = . then race = .;
+    else if RIDRETH1 = 3 then race = 1;
+    else if RIDRETH1 = 4 then race = 2;
+    else if RIDRETH1 in (1, 2) then race = 3;
+    else race = 4;
+
+    /* Reducing race to 3 groups */
+    if race = . then race3 = .;
+    else if race in (3, 4) then race3 = 3;
+    else race3 = race;
+
+   /* Labeling original variables used in recoding */
+    label
+        RIAGENDR = "Original Gender Variable (1=Male, 2=Female)"
+        DMDEDUC2 = "Education level (Adults 20+), 1: <9th, 2: 9-11th, 3: High school/GED, 4: Some college/AA, 5: College+"
+        INDFMPIR = "Family Income to Poverty Ratio"
+        RIDRETH1 = "Race/Hispanic Origin, 1:Mexican Am, 2:Other Hisp, 3:White, 4:Black, 5:Other";
+
+    /* Labels for recoded and derived variables, with value explanation */
+    label
+        female = "Binary gender recode: 1=Female, 0=Male"
+        edu = "Education recode: 1=Less than HS, 2=Some HS, 3=HS graduate or more"
+        pirg4 = "Poverty index recode: 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0"
+        race = "Race recode: 1=White, 2=Black, 3=Hispanic, 4=Other"
+        race3 = "Race recode 3-group: 1=White, 2=Black, 3=Hispanic/Other";
+run;
+
+/* Task 3: Checking accuracy of recoded variables */
+
+proc freq data=peri_all2;
+    tables female edu pirg4 race race3 / missing;
+run;
+
+/* Gender: RIAGENDR vs. female */
+proc freq data=peri_all2;
+    tables RIAGENDR*female / missing list;
+    title 'Check Gender Recode: RIAGENDR vs. female';
+run;
+
+/* Education: DMDEDUC2 vs. edu */
+proc freq data=peri_all2;
+    tables DMDEDUC2*edu / missing list;
+    title 'Check Education Recode: DMDEDUC2 vs. edu';
+run;
+
+/* Poverty index: INDFMPIR vs. pirg4 */
+proc freq data=peri_all2;
+    tables pirg4 / missing;
+    title 'Check Poverty Grouping: pirg4';
+run;
+
+/* Race: RIDRETH1 -> race and race3 */
+proc freq data=peri_all2;
+    tables RIDRETH1*race RIDRETH1*race3 / missing list;
+    title 'Check Race Recode: RIDRETH1 vs. race and race3';
+run;
+
+
 /*============================================*/
 /* SECTION 3: SET UP ELIGIBILITY CRITERIA IN DATASET PT */
 /*============================================*/
@@ -757,7 +839,7 @@ data pt_2;
         if Caries_Count >= 1 then Caries_YN = 1;
         else Caries_YN = 0;
     %mend check_caries;
-*/
+
     /* Execute Macro for Caries */
     %check_caries;
 
@@ -766,7 +848,41 @@ data pt_2;
     else if remaining_teeth >= 28 then Missing_Teeth_YN = 'No';
     else Missing_Teeth_YN = ''; /* Missing */
 
+    label
+        Gender = "Gender: Male or Female (from RIAGENDR)"
+        Education_Level = "Education: <High School, High School, >High School (from DMDEDUC2)"
+        Poverty_Index = "Poverty Index: <=1, 1.1-2, 2.1-4, >4 (from INDFMPIR)"
+        Race_Grp = "Race/Ethnicity Group: Non-Hispanic White, Non-Hispanic Black, Hispanic/Others (from RIDRETH3)"
+        BMI_category = "BMI Group: <25, 25-29.9, >=30 (from BMXBMI)"
+        Diabetes_status = "Diabetes Status: Yes, No, Borderline (from DIQ010)"
+        Ever_Smoker = "Smoking Status: Never or Ever Smoker (from SMQ020)"
+        Binge_Drinking = "Binge Drinking Status: Yes or No (from ALQ151)"
+        Marital_Status = "Marital Status: Married/Partnered or Widowed/Separated (from DMDMARTL)"
+        Xerostomia = "Self-reported Dry Mouth: Yes or No (from CSQ200)"
+        Caries_YN = "Dental Caries Presence: 1=Yes, 0=No (from OHX*CTC='Z')"
+        Caries_Count = "Count of Teeth with Caries (Z code in OHX*CTC)"
+        Missing_Teeth_YN = "Missing Teeth (Remaining < 28): Yes or No";
 run;
+
+proc freq data=pt_2;
+    tables 
+        Gender 
+        Education_Level 
+        Poverty_Index 
+        Race_Grp 
+        BMI_category 
+        Diabetes_status 
+        Ever_Smoker 
+        Binge_Drinking 
+        Marital_Status 
+        Xerostomia 
+        Missing_Teeth_YN 
+        Caries_YN / missing list;
+    title "Frequency Checks for Recoded Categorical Variables";
+run;
+
+
+
 
 
   /*============================================*/
