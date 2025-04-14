@@ -110,7 +110,7 @@ else peri_t&tooth.=0;
 %mend t_count;
 
 /*============================================*/
-/* SECTION 2 : MERGING AND CREATING PERI_ALL - all main variables */
+/* SECTION 2 : MERGING AND CREATING PERI_ALL - CLEANING all main variables */
 /*============================================*/
 
 proc sort data=permdata.ohxper_h;
@@ -526,90 +526,8 @@ There are only 1 person in peri-stage 1.
 However, this person did not have taste variables, so was excluced from the analytical dataset. 
 */
 
-/* SECTION 2a: Trying to recode peri_all with new coding methods*/
-/* Creating recoded dataset with new variables for demographic covariates */
-data peri_all2;
-    set peri_all;
-
-    /* Recoding gender */
-    if RIAGENDR = . then female = .;
-    else if RIAGENDR = 2 then female = 1;
-    else female = 0;
-
-    /* Recoding education */
-    if DMDEDUC2 in (., 7, 9) then edu = .;
-    else if DMDEDUC2 = 1 then edu = 1;
-    else if DMDEDUC2 in (2, 3) then edu = 2;
-    else edu = 3;
-
-    /* Recoding poverty index */
-    if INDFMPIR = . then pirg4 = .;
-    else if INDFMPIR <= 1 then pirg4 = 1;
-    else if INDFMPIR <= 2 then pirg4 = 2;
-    else if INDFMPIR <= 4 then pirg4 = 3;
-    else pirg4 = 4;
-
-    /* Recoding race */
-    if RIDRETH1 = . then race = .;
-    else if RIDRETH1 = 3 then race = 1;
-    else if RIDRETH1 = 4 then race = 2;
-    else if RIDRETH1 in (1, 2) then race = 3;
-    else race = 4;
-
-    /* Reducing race to 3 groups */
-    if race = . then race3 = .;
-    else if race in (3, 4) then race3 = 3;
-    else race3 = race;
-
-   /* Labeling original variables used in recoding */
-    label
-        RIAGENDR = "Original Gender Variable (1=Male, 2=Female)"
-        DMDEDUC2 = "Education level (Adults 20+), 1: <9th, 2: 9-11th, 3: High school/GED, 4: Some college/AA, 5: College+"
-        INDFMPIR = "Family Income to Poverty Ratio"
-        RIDRETH1 = "Race/Hispanic Origin, 1:Mexican Am, 2:Other Hisp, 3:White, 4:Black, 5:Other";
-
-    /* Labels for recoded and derived variables, with value explanation */
-    label
-        female = "Binary gender recode: 1=Female, 0=Male"
-        edu = "Education recode: 1=Less than HS, 2=Some HS, 3=HS graduate or more"
-        pirg4 = "Poverty index recode: 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0"
-        race = "Race recode: 1=White, 2=Black, 3=Hispanic, 4=Other"
-        race3 = "Race recode 3-group: 1=White, 2=Black, 3=Hispanic/Other";
-run;
-
-/* Task 3: Checking accuracy of recoded variables */
-
-proc freq data=peri_all2;
-    tables female edu pirg4 race race3 / missing;
-run;
-
-/* Gender: RIAGENDR vs. female */
-proc freq data=peri_all2;
-    tables RIAGENDR*female / missing list;
-    title 'Check Gender Recode: RIAGENDR vs. female';
-run;
-
-/* Education: DMDEDUC2 vs. edu */
-proc freq data=peri_all2;
-    tables DMDEDUC2*edu / missing list;
-    title 'Check Education Recode: DMDEDUC2 vs. edu';
-run;
-
-/* Poverty index: INDFMPIR vs. pirg4 */
-proc freq data=peri_all2;
-    tables pirg4 / missing;
-    title 'Check Poverty Grouping: pirg4';
-run;
-
-/* Race: RIDRETH1 -> race and race3 */
-proc freq data=peri_all2;
-    tables RIDRETH1*race RIDRETH1*race3 / missing list;
-    title 'Check Race Recode: RIDRETH1 vs. race and race3';
-run;
-
-
 /*============================================*/
-/* SECTION 3: SET UP ELIGIBILITY CRITERIA IN DATASET PT */
+/* SECTION 3: ELIGIBILITY CRITERIA & PERMANENT DATASET permdata.peri_taste_n2155_250414 */
 /*============================================*/
 
 /**** 
@@ -631,42 +549,6 @@ data pt;
  if peri_g2=. then delete;
  if remaining_teeth_p28>=2 ;
 run;
-
-
-proc freq data=pt;
- table peri_g2 *peri_stage_n/missing ;
- *table disab_salty_tp disab_salty_wm disab_salty_all disab_bit_tp disab_bit_wm disab_bit_all;
- run;
-
-proc means data=pt;
- var age;
- run;
-
-proc means data=pt;
- where  peri_g2=0 and peri_test=0;
- var remaining_teeth;
- run;
-
-/*2025 CODE USED TO CREATED NEW TABLES AND FREQUENCIES*/
- /*Main dataset = pt*/
- /*Main explanatory variables = peri_g2 & peri_stage_N*/
- /*Main response variables = disab_salty_all disab_bitter_all*/
- /*Extra response variables = disab_salty_tp disab_salty_wm disab_bit_wm disab_bit_tp*/
-
-/*********************
-3/30/2025, LinHY 
-For Mansi, 
-1. work based on the codes I checked previously
-2. save the major data file as a SAS permanent dataset
-3. Use separate data steps for data merge and variable recoding. 
-4. sort data by ID before merging data
-5. for variable recoding, use numbers instead of texts. 
-6. Add labels for all used variables (old and new)
-**************/;
-
-
-/*******Frequency tables for secondary predictors! ******/
-/* Merge additional datasets and recode variables */
 
 proc sort data=pt;
    by SEQN;
@@ -702,11 +584,7 @@ proc sort data=permdata.csq_h;
  by seqn;
  run;
 
- /*============================================*/
-/* SECTION 4 : PT_2 - DEMOGRAPHIC PREDICTORS */
-/*============================================*/
-
-/** LinHY merge all required datasets **/;
+/** Merge all required datasets **/;
 data pt_2a;
     merge pt(in=a) permdata.bmx_h(in=b) permdata.alq_h(in=c) permdata.diq_h(in=d) permdata.smq_h(in=e)
             permdata.csq_h   permdata.ohq_h permdata.ohxper_h   permdata.rxq_rx_h ;
@@ -720,112 +598,87 @@ proc freq data=pt_2a;
  run;
 
 /***
-data permdata.peri_taste_n2155_250331;
+data permdata.peri_taste_n2155_250414;
  set pt_2a;
  run;
 
 <use>
-data pt_2a;
- set permdata.peri_taste_n2155_250331;
+data pt_2;
+ set permdata.peri_taste_n2155_250414;
 run;
 *******/;
 
+/*============================================*/
+/* SECTION 4 : pt_2 Recoding & labeling peri_all with new coding methods */
+/*============================================*/
+/* Creating recoded dataset with new variables for demographic covariates */
 
 data pt_2;
-  /* Define Lengths for New Variables */
-    *length Xerostomia $15 Dental_Caries $10 Medication_Type $50 Missing_Teeth_YN $10;
+    set permdata.peri_taste_n2155_250414;
 
- set pt_2a;
-    /* Recode Gender */
-    length Gender $10;
-    if RIAGENDR = 1 then Gender = 'Male';
-    else if RIAGENDR = 2 then Gender = 'Female';
-    else Gender = '';
+    /* Recoding gender */
+    if RIAGENDR = . then female = .;
+    else if RIAGENDR = 2 then female = 1;
+    else female = 0;
 
-    /* Recode Education Level */
-    length Education_Level $15;
-    if DMDEDUC2 in (1,2) then Education_Level = '<High School';
-    else if DMDEDUC2 = 3 then Education_Level = 'High School';
-    else if DMDEDUC2 in (4,5) then Education_Level = '>High School';
-    else Education_Level = '';
+    /* Recoding education */
+    if DMDEDUC2 in (., 7, 9) then edu = .;
+    else if DMDEDUC2 = 1 then edu = 1;
+    else if DMDEDUC2 in (2, 3) then edu = 2;
+    else edu = 3;
 
-    /* Recode Poverty Index */
-    length Poverty_Index $10;
-    if INDFMPIR <= 1 then Poverty_Index = '<=1';
-    else if INDFMPIR > 1 and INDFMPIR <= 2 then Poverty_Index = '1.1-2';
-    else if INDFMPIR > 2 and INDFMPIR <= 4 then Poverty_Index = '2.1-4';
-    else if INDFMPIR > 4 then Poverty_Index = '>4';
-    else Poverty_Index = '';
+    /* Recoding poverty index */
+    if INDFMPIR = . then pirg4 = .;
+    else if INDFMPIR <= 1 then pirg4 = 1;
+    else if INDFMPIR <= 2 then pirg4 = 2;
+    else if INDFMPIR <= 4 then pirg4 = 3;
+    else pirg4 = 4;
 
-    /* Recode Race */
-    length Race_Grp $25;
-    if RIDRETH3 = 3 then Race_Grp = 'Non-Hispanic White';
-    else if RIDRETH3 = 4 then Race_Grp = 'Non-Hispanic Black';
-    else Race_Grp = 'Hispanic or Others';
+    /* Recoding race */
+    if RIDRETH1 = . then race = .;
+    else if RIDRETH1 = 3 then race = 1;
+    else if RIDRETH1 = 4 then race = 2;
+    else if RIDRETH1 in (1, 2) then race = 3;
+    else race = 4;
 
-    /* Recode Obesity */
-    length BMI_category $10;
-    if BMXBMI <= 24.9 then BMI_category = '<25';
-    else if BMXBMI <= 29.9 then BMI_category = '25-29.9';
-    else if BMXBMI >= 30 then BMI_category = '>=30';
-    else BMI_category = '';
+    /* Reducing race to 3 groups */
+    if race = . then race3 = .;
+    else if race in (3, 4) then race3 = 3;
+    else race3 = race;
+	
+    /* Obesity: numeric recode in original variable name */
+    if BMXBMI = . then BMI_category = .;
+    else if BMXBMI <= 24.9 then BMI_category = 1;
+    else if BMXBMI <= 29.9 then BMI_category = 2;
+    else if BMXBMI >= 30 then BMI_category = 3;
 
-    /* Recode Diabetes */
-    length Diabetes_status $15;
-    if DIQ010 = 1 then Diabetes_status = 'Yes';
-    else if DIQ010 = 2 then Diabetes_status = 'No';
-    else if DIQ010 = 3 then Diabetes_status = 'Borderline';
-    else Diabetes_status = '';
+    /* Diabetes */
+    if DIQ010 = . then Diabetes_status = .;
+    else if DIQ010 = 1 then Diabetes_status = 1; 
+    else if DIQ010 = 2 then Diabetes_status = 2; 
+    else if DIQ010 = 3 then Diabetes_status = 3; 
 
-    /* Recode Smoking */
-    length Ever_Smoker $15;
-    if SMQ020 = 1 then Ever_Smoker = 'Never Smoker';
-    else if SMQ020 in (2,3) then Ever_Smoker = 'Ever Smoker';
-    else Ever_Smoker = '';
+    /* Smoking */
+    if SMQ020 = . then Ever_Smoker = .;
+    else if SMQ020 = 1 then Ever_Smoker = 1; 
+    else if SMQ020 in (2, 3) then Ever_Smoker = 2; 
 
-    /* Recode Binge Drinking */
-    length Binge_Drinking $10;
-    if ALQ151 = 1 then Binge_Drinking = 'Yes';
-    else if ALQ151 = 2 then Binge_Drinking = 'No';
-    else Binge_Drinking = '';
+    /* Binge Drinking */
+    if ALQ151 = . then Binge_Drinking = .;
+    else if ALQ151 = 1 then Binge_Drinking = 1;
+    else if ALQ151 = 2 then Binge_Drinking = 0;
 
-    /* Recode Marital Status */
-    length Marital_Status $30;
-    if DMDMARTL in (1,6) then Marital_Status = 'Married or Living with Partner';
-    else if DMDMARTL in (2,3,4,5) then Marital_Status = 'Widowed, Divorced, Separated';
-    else Marital_Status = '';
+    /* Marital Status */
+    if DMDMARTL = . then Marital_Status = .;
+    else if DMDMARTL in (1,6) then Marital_Status = 1; 
+    else if DMDMARTL in (2,3,4,5) then Marital_Status = 2; 
 
+    /* Xerostomia */
+    if CSQ200 = . then Xerostomia = .;
+    else if CSQ200 = 1 then Xerostomia = 1;
+    else if CSQ200 = 2 then Xerostomia = 0;
 
-
-    /* --- Xerostomia (Dry Mouth) --- */
-    if CSQ200 in (1) then Xerostomia = 'Yes';
-    else if CSQ200 in (2) then Xerostomia = 'No';
-    else Xerostomia = ''; /* Missing */
-
-	/** 3/30/2025, LinHY
-	OHX&i.CTC is not correct should be OHX&i.TC
-	***/;
-
-    /* --- Macro to Check Caries Presence --- */
-        /* Loop through 28 teeth (Excluding 3rd Molars) */
-	/* Assign Binary Indicator 
 	%macro check_caries;
-        Caries_Count = 0; 
-
-        %do i = 2 %to 15;
-            if OHX&i.TC = 'Z' then Caries_Count + 1;
-        %end;
-        %do i = 18 %to 31;
-            if OHX&i.TC = 'Z' then Caries_Count + 1;
-        %end;
-
-        
-        if Caries_Count >= 1 then Caries_YN = 1;
-        else Caries_YN = 0;
-    %mend check_caries;*/
-
-
-%macro check_caries;
         Caries_Count = 0; 
 
         %do i = 2 %to 15;
@@ -844,32 +697,46 @@ data pt_2;
     %check_caries;
 
     /* --- Missing Teeth Yes/No --- */
-    if remaining_teeth < 28 then Missing_Teeth_YN = 'Yes';
-    else if remaining_teeth >= 28 then Missing_Teeth_YN = 'No';
+    if remaining_teeth < 28 then Missing_Teeth_YN = 1;
+    else if remaining_teeth >= 28 then Missing_Teeth_YN = 0;
     else Missing_Teeth_YN = ''; /* Missing */
 
+   /* Labeling original variables used in recoding */
     label
-        Gender = "Gender: Male or Female (from RIAGENDR)"
-        Education_Level = "Education: <High School, High School, >High School (from DMDEDUC2)"
-        Poverty_Index = "Poverty Index: <=1, 1.1-2, 2.1-4, >4 (from INDFMPIR)"
-        Race_Grp = "Race/Ethnicity Group: Non-Hispanic White, Non-Hispanic Black, Hispanic/Others (from RIDRETH3)"
-        BMI_category = "BMI Group: <25, 25-29.9, >=30 (from BMXBMI)"
-        Diabetes_status = "Diabetes Status: Yes, No, Borderline (from DIQ010)"
-        Ever_Smoker = "Smoking Status: Never or Ever Smoker (from SMQ020)"
-        Binge_Drinking = "Binge Drinking Status: Yes or No (from ALQ151)"
-        Marital_Status = "Marital Status: Married/Partnered or Widowed/Separated (from DMDMARTL)"
-        Xerostomia = "Self-reported Dry Mouth: Yes or No (from CSQ200)"
+        RIAGENDR = "Original Gender Variable (1=Male, 2=Female)"
+        DMDEDUC2 = "Education level (Adults 20+), 1: <9th, 2: 9-11th, 3: High school/GED, 4: Some college/AA, 5: College+"
+        INDFMPIR = "Family Income to Poverty Ratio"
+        RIDRETH1 = "Race/Hispanic Origin, 1:Mexican Am, 2:Other Hisp, 3:White, 4:Black, 5:Other";
+
+    /* Labels for recoded and derived variables, with value explanation */
+    label
+        female = "Binary gender recode: 1=Female, 0=Male"
+        edu = "Education recode: 1=Less than HS, 2=Some HS, 3=HS graduate or more"
+        pirg4 = "Poverty index recode: 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0"
+        race = "Race recode: 1=White, 2=Black, 3=Hispanic, 4=Other"
+        race3 = "Race recode 3-group: 1=White, 2=Black, 3=Hispanic/Other"
+		BMI_category = "BMI Category: 1=<25, 2=25-29.9, 3=30+"
+        Diabetes_status = "Diabetes Status: 1=Yes, 2=No, 3=Borderline"
+        Ever_Smoker = "Smoking Status: 1=Never, 2=Ever"
+        Binge_Drinking = "Binge Drinking: 1=Yes, 0=No"
+        Marital_Status = "Marital Status: 1=Married/Partnered, 2=Widowed/Divorced/Separated"
+        Xerostomia = "Xerostomia: 1=Yes, 0=No"
+		Caries_Count = "Count of Teeth with Caries (Z code in OHX*CTC)"
+        Missing_Teeth_YN = "Missing Teeth (Remaining < 28): 1 = Yes, 0 = No"
         Caries_YN = "Dental Caries Presence: 1=Yes, 0=No (from OHX*CTC='Z')"
-        Caries_Count = "Count of Teeth with Caries (Z code in OHX*CTC)"
-        Missing_Teeth_YN = "Missing Teeth (Remaining < 28): Yes or No";
+;
 run;
+
+
+/* Task 3: Checking accuracy of recoded variables */
+
+proc freq data=pt_2;
+    tables female edu pirg4 race race3 / missing;
+run;
+
 
 proc freq data=pt_2;
     tables 
-        Gender 
-        Education_Level 
-        Poverty_Index 
-        Race_Grp 
         BMI_category 
         Diabetes_status 
         Ever_Smoker 
@@ -878,11 +745,31 @@ proc freq data=pt_2;
         Xerostomia 
         Missing_Teeth_YN 
         Caries_YN / missing list;
-    title "Frequency Checks for Recoded Categorical Variables";
 run;
 
+/* Gender: RIAGENDR vs. female */
+proc freq data=pt_2;
+    tables RIAGENDR*female / missing list;
+    title 'Check Gender Recode: RIAGENDR vs. female 1=Female, 0=Male';
+run;
 
+/* Education: DMDEDUC2 vs. edu */
+proc freq data=pt_2;
+    tables DMDEDUC2*edu / missing list;
+    title 'Check Education Recode: DMDEDUC2 vs. edu 1=Less than HS, 2=Some HS, 3=HS graduate or more';
+run;
 
+/* Poverty index: INDFMPIR vs. pirg4 */
+proc freq data=pt_2;
+    tables pirg4 / missing;
+    title 'Check Poverty Grouping: pirg4 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0';
+run;
+
+/* Race: RIDRETH1 -> race and race3 */
+proc freq data=pt_2;
+    tables RIDRETH1*race3 / missing list;
+    title 'Check Race Recode: RIDRETH1 vs. race3 3-group: 1=White, 2=Black, 3=Hispanic/Other';
+run;
 
 
   /*============================================*/
@@ -891,7 +778,7 @@ run;
 
 /**************************** FREQUENCY TABLES ***********************************/
 
-proc freq data =  peri_all;
+proc freq data =  pt_2;
 *table peri_g2* peri_stage_N/missing ;
 table (disab_salty_all disab_bit_all)*peri_stage_N/missing ;
 run;
@@ -902,67 +789,19 @@ however, there are 611 misisng for peri-test
 
 ***/;
 
-proc means data=peri_all;
-  class t_ls20;
-  var remaining_teeth;
-  run;
-
-proc freq data=peri_all;
- where peri_g2=.;
- table peri_total_all* peri_total_any* peri_total_mis/list missing;
-run;
-
-proc freq data=peri_all;
- where t02=1;
- table LOA_4s_ge1_02* pD_4s_ge4_02 peri_t02/missing ;
- run;
-
-proc means data=peri_all n mean median std min max maxdec=2;
- var remaining_teeth peri_total_mis;
- run;
-
-
-
-proc freq data=peri_all;
- where t02=1;
-  table LOA_DF_02 *LOA_MF_02* LOA_DL_02* LOA_ML_02 LOA_4s_ge1_02 /list missing ;
- run;
-
-proc freq data=peri_all;
- where t02=1;
-  table PD_DF_02 *PD_MF_02* PD_DL_02* PD_ML_02 PD_4s_ge4_02 /list missing ;
- run;
-
-proc freq data=peri_all;
- where t03=1;
-  table LOA_DF_03 *LOA_MF_03* LOA_DL_03* LOA_ML_03 LOA_4s_ge1_03 /list missing ;
- run;
-
-proc freq data=peri_all;
- table peri_t02* t02/missing;
- table peri_t03* t03/missing;
- run;
 
 /* Creating the table for Bitter (disab_bit_all) */
-proc freq data=pt;
+proc freq data=pt_2;
     tables (peri_g2 peri_stage_N age) * disab_bit_all / chisq norow nocol nopercent;
     title "Table for disab_bit_all (Bitter)";
 run;
 
 /* Creating the table for Salty (disab_salty_all) */
-proc freq data=pt;
+proc freq data=pt_2;
     tables (peri_g2 peri_stage_N age) * disab_salty_all / chisq norow nocol nopercent;
     title "Table for disab_salty_all (Salty)";
 run;
 
-
-/* Frequency Tables for Newly Added Dental and Medication Variables */
-proc freq data=pt_2;
-    tables Xerostomia / missing;
-    tables Caries_YN / missing;
-    tables Caries_Count / missing;
-    tables Missing_Teeth_YN / missing;
-run;
 
 /* Cross-tabulations with Periodontitis and Taste Disabilities */
 proc freq data=pt_2;
@@ -984,131 +823,131 @@ tables RXDDRUG;
 run;
 
 
-/* /*============================================*/*/
-/*/* SECTION 6 : LOA LEVEL INDIVIDUAL NUMBERS FOR PI */*/
-/*/*============================================*/*/
-/**/
-/*/* Getting all individual LOAs and LOA variables */*/
-/**/
-/*/**/
-/*Stages of Periodontitis:*/
-/*Attachment loss and probing depth is measured on six surfaces (DF, MDF, MF, DL, MDL, ML) per tooth. */
-/*If defined as periodontitis, following criteria is used to define as different stages (increasing stage means increasing severity).*/
-/*Stage 1: attachment loss of 1-2 mm (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML))*/
-/*Stage 2: attachment loss of 3-4 mm (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML))*/
-/*Stage 3: attachment loss of 5 or >5 mm (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML))*/
-/*Stage 4: attachment loss of 5 or >5 mm with less than 20 remaining teeth (missing eleven teeth or more)*/
-/**/
-/*remaining_teeth='remaining teeth count based on 32 teeth'*/
-/*remaining_teeth_p28='remaining teeth count based on 28 teeth'*/
-/*t_ls20='<20 teeth based on 32 teeth'*/
-/**/*/
-/**/
-/*proc freq data=pt_2;*/
-/* *table LOA_DF_02 LOA_MF_02 LOA_DL_02 LOA_ML_02;*/
-/* table remaining_teeth t_ls20;*/
-/* run;*/
-/**/
-/*proc print data=pt_2s ;*/
-/* *var max_LOA_02 LOA_DF_02 LOA_MF_02 LOA_DL_02 LOA_ML_02;*/
-/*var max_LOA_03 LOA_DF_03 LOA_MF_03 LOA_DL_03 LOA_ML_03;*/
-/** var  max_LOA_total max_LOA_02  max_LOA_03  max_LOA_04  max_LOA_05  max_LOA_06  max_LOA_07  max_LOA_08  max_LOA_09  max_LOA_10 */
-/*      max_LOA_11  max_LOA_12  max_LOA_13  max_LOA_14  max_LOA_15  */
-/*	  max_LOA_18  max_LOA_19  max_LOA_20  max_LOA_21  max_LOA_22  max_LOA_23  max_LOA_24  max_LOA_25  max_LOA_26 */
-/*	  max_LOA_27  max_LOA_28  max_LOA_29  max_LOA_30  max_LOA_31;*/
-/* run;*/
-/**/
-/*proc freq data=pt_2s;*/
-/* where peri_g2=1;*/
-/* *table max_LOA_02 max_LOA_03 max_LOA_31;*/
-/* table t_ls20 remaining_teeth;*/
-/* *table t_ls20  max_LOA_total max_LOA_total_g3;*/
-/* *table t_ls20*  max_LOA_total_g3 peri_stage_N;*/
-/* table peri_stage_N;*/
-/* run;*/
-/**/
-/**/
-/*/****************/
-/* data set for PI to check (n=9, n=3 for each stage)*/
-/* **********/;*/
-/**/
-/*data per_stage_PI  ;*/
-/*   retain  seqn peri_stage_N max_LOA_total max_LOA_total_g3 t_ls20 remaining_teeth   max_LOA_02  max_LOA_03  max_LOA_04  */
-/*       max_LOA_05  max_LOA_06  max_LOA_07  max_LOA_08  max_LOA_09  max_LOA_10 */
-/*      max_LOA_11  max_LOA_12  max_LOA_13  max_LOA_14  max_LOA_15  */
-/*	  max_LOA_18  max_LOA_19  max_LOA_20  max_LOA_21  max_LOA_22  max_LOA_23  max_LOA_24  max_LOA_25  max_LOA_26 */
-/*	  max_LOA_27  max_LOA_28  max_LOA_29  max_LOA_30  max_LOA_31;*/
-/**/
-/* set  pt_2;*/
-/**/
-/*  keep  seqn peri_stage_N max_LOA_total max_LOA_total_g3 t_ls20 remaining_teeth   max_LOA_02  max_LOA_03  max_LOA_04  */
-/*     max_LOA_05  max_LOA_06  max_LOA_07  max_LOA_08  max_LOA_09  max_LOA_10 */
-/*      max_LOA_11  max_LOA_12  max_LOA_13  max_LOA_14  max_LOA_15  */
-/*	  max_LOA_18  max_LOA_19  max_LOA_20  max_LOA_21  max_LOA_22  max_LOA_23  max_LOA_24  max_LOA_25  max_LOA_26 */
-/*	  max_LOA_27  max_LOA_28  max_LOA_29  max_LOA_30  max_LOA_31;*/
-/**/
-/*run;*/
-/**/
-/*proc sort data=per_stage_PI;*/
-/* by seqn;*/
-/* run;*/
-/**/
-/*data per_stage_PI_2;*/
-/* set per_stage_PI;*/
-/* if peri_stage_N=2;*/
-/*run;*/
-/**/
-/*data per_stage_PI_2a;*/
-/* set per_stage_PI_2;*/
-/*  by seqn;*/
-/*  if _N_<=3;*/
-/* run;*/
-/**/
-/**/
-/*data per_stage_PI_3;*/
-/* set per_stage_PI;*/
-/* if peri_stage_N=3;*/
-/*run;*/
-/**/
-/*data per_stage_PI_3a;*/
-/* set per_stage_PI_3;*/
-/*  by seqn;*/
-/*  if _N_<=3;*/
-/* run;*/
-/**/
-/*data per_stage_PI_4;*/
-/* set per_stage_PI;*/
-/* if peri_stage_N=4;*/
-/*run;*/
-/**/
-/*data per_stage_PI_4a;*/
-/* set per_stage_PI_4;*/
-/*  by seqn;*/
-/*  if _N_<=3;*/
-/* run;*/
-/**/
-/*data per_stage_PI_n9;*/
-/* set per_stage_PI_2a per_stage_PI_3a per_stage_PI_4a;*/
-/* run;*/
-/**/
-/*/****/
-/*  data set for PI to check (n=9, n=3 for each stage)*/
-/**/
-/*  data permdata.per_stage_PI_n9;*/
-/*  set per_stage_PI_n9;*/
-/* run;*/
-/**/
-/* < label> */
-/*    remaining_teeth='remaining teeth count based on 32 teeth'*/
-/*    t_ls20='<20 teeth based on 32 teeth'*/
-/**/
-/*    max_LOA_02='tooth_02, max attachment loss of 4 surfaces (DF, MF, DL and ML)'*/
-/*	max_LOA_03='tooth_03, max attachment loss of 4 surfaces (DF, MF, DL and ML)'*/
-/**/
-/*	max_LOA_total='max attachment loss of 4 surfaces among the 28 teeth'*/
-/*	max_LOA_total_g3='max attachment loss of 4 surfaces among the 28 teeth, 1: 1-2, 2: 3-4, 3:>=5 mm'*/
-/*	peri_stage_n='periodontitis stage, 1-4'*/
-/*	;*/
-/**/
-/* *************/;*/
-/**/
+ /*============================================*/
+/* SECTION EXTRA1 : ANALYSIS FOR PI */
+/*============================================*/
+
+/* Getting all individual LOAs and LOA variables */
+
+/*
+Stages of Periodontitis:
+Attachment loss and probing depth is measured on six surfaces (DF, MDF, MF, DL, MDL, ML) per tooth. 
+If defined as periodontitis, following criteria is used to define as different stages (increasing stage means increasing severity).
+Stage 1: attachment loss of 1-2 mm (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML))
+Stage 2: attachment loss of 3-4 mm (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML))
+Stage 3: attachment loss of 5 or >5 mm (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML))
+Stage 4: attachment loss of 5 or >5 mm with less than 20 remaining teeth (missing eleven teeth or more)
+
+remaining_teeth='remaining teeth count based on 32 teeth'
+remaining_teeth_p28='remaining teeth count based on 28 teeth'
+t_ls20='<20 teeth based on 32 teeth'
+*/
+
+/**
+proc freq data=pt_2;
+ *table LOA_DF_02 LOA_MF_02 LOA_DL_02 LOA_ML_02;
+ table remaining_teeth t_ls20;
+ run;
+
+proc print data=pt_2s ;
+ *var max_LOA_02 LOA_DF_02 LOA_MF_02 LOA_DL_02 LOA_ML_02;
+var max_LOA_03 LOA_DF_03 LOA_MF_03 LOA_DL_03 LOA_ML_03;
+* var  max_LOA_total max_LOA_02  max_LOA_03  max_LOA_04  max_LOA_05  max_LOA_06  max_LOA_07  max_LOA_08  max_LOA_09  max_LOA_10 
+      max_LOA_11  max_LOA_12  max_LOA_13  max_LOA_14  max_LOA_15  
+	  max_LOA_18  max_LOA_19  max_LOA_20  max_LOA_21  max_LOA_22  max_LOA_23  max_LOA_24  max_LOA_25  max_LOA_26 
+	  max_LOA_27  max_LOA_28  max_LOA_29  max_LOA_30  max_LOA_31;
+ run;
+
+proc freq data=pt_2s;
+ where peri_g2=1;
+ *table max_LOA_02 max_LOA_03 max_LOA_31;
+ table t_ls20 remaining_teeth;
+ *table t_ls20  max_LOA_total max_LOA_total_g3;
+ *table t_ls20*  max_LOA_total_g3 peri_stage_N;
+ table peri_stage_N;
+ run;
+**/
+
+/***************
+ data set for PI to check (n=9, n=3 for each stage)
+ **********/;
+/**
+data per_stage_PI  ;
+   retain  seqn peri_stage_N max_LOA_total max_LOA_total_g3 t_ls20 remaining_teeth   max_LOA_02  max_LOA_03  max_LOA_04  
+       max_LOA_05  max_LOA_06  max_LOA_07  max_LOA_08  max_LOA_09  max_LOA_10 
+      max_LOA_11  max_LOA_12  max_LOA_13  max_LOA_14  max_LOA_15  
+	  max_LOA_18  max_LOA_19  max_LOA_20  max_LOA_21  max_LOA_22  max_LOA_23  max_LOA_24  max_LOA_25  max_LOA_26 
+	  max_LOA_27  max_LOA_28  max_LOA_29  max_LOA_30  max_LOA_31;
+
+ set  pt_2;
+
+  keep  seqn peri_stage_N max_LOA_total max_LOA_total_g3 t_ls20 remaining_teeth   max_LOA_02  max_LOA_03  max_LOA_04  
+     max_LOA_05  max_LOA_06  max_LOA_07  max_LOA_08  max_LOA_09  max_LOA_10 
+      max_LOA_11  max_LOA_12  max_LOA_13  max_LOA_14  max_LOA_15  
+	  max_LOA_18  max_LOA_19  max_LOA_20  max_LOA_21  max_LOA_22  max_LOA_23  max_LOA_24  max_LOA_25  max_LOA_26 
+	  max_LOA_27  max_LOA_28  max_LOA_29  max_LOA_30  max_LOA_31;
+
+run;
+
+proc sort data=per_stage_PI;
+ by seqn;
+ run;
+
+data per_stage_PI_2;
+ set per_stage_PI;
+ if peri_stage_N=2;
+run;
+
+data per_stage_PI_2a;
+ set per_stage_PI_2;
+  by seqn;
+  if _N_<=3;
+ run;
+
+
+data per_stage_PI_3;
+ set per_stage_PI;
+ if peri_stage_N=3;
+run;
+
+data per_stage_PI_3a;
+ set per_stage_PI_3;
+  by seqn;
+  if _N_<=3;
+ run;
+
+data per_stage_PI_4;
+ set per_stage_PI;
+ if peri_stage_N=4;
+run;
+
+data per_stage_PI_4a;
+ set per_stage_PI_4;
+  by seqn;
+  if _N_<=3;
+ run;
+
+data per_stage_PI_n9;
+ set per_stage_PI_2a per_stage_PI_3a per_stage_PI_4a;
+ run;
+**/
+/***
+  data set for PI to check (n=9, n=3 for each stage)
+
+  data permdata.per_stage_PI_n9;
+  set per_stage_PI_n9;
+ run;
+
+ < label> 
+    remaining_teeth='remaining teeth count based on 32 teeth'
+    t_ls20='<20 teeth based on 32 teeth'
+
+    max_LOA_02='tooth_02, max attachment loss of 4 surfaces (DF, MF, DL and ML)'
+	max_LOA_03='tooth_03, max attachment loss of 4 surfaces (DF, MF, DL and ML)'
+
+	max_LOA_total='max attachment loss of 4 surfaces among the 28 teeth'
+	max_LOA_total_g3='max attachment loss of 4 surfaces among the 28 teeth, 1: 1-2, 2: 3-4, 3:>=5 mm'
+	peri_stage_n='periodontitis stage, 1-4'
+	;
+
+ *************/;
