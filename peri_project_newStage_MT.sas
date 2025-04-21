@@ -133,7 +133,7 @@ run;
 data merging_per_den;
     merge permdata.ohxper_h (in=a) permdata.ohxden_h (in=b) permdata.demo_h permdata.csx_h;
     by SEQN;
-    if a; /* Keeps only observations that are in ohxper_h */
+ *   if a; /* Keeps only observations that are in ohxper_h */
 run;
 
 /* Creating a dataset to calculate periodontitis for all relevant teeth */
@@ -800,11 +800,11 @@ run;
 * The above works as elig (1) = 2155*;
 
 proc surveymeans data=pt_2 mean stderr clm;
-	where elig=1;
+	where disab_salty_all = 1;
     strata sdmvstra;
     cluster sdmvpsu;
     weight wtmec2yr;
-    domain disab_salty_all;
+    domain elig;
     var 
         female 
         edu 
@@ -819,31 +819,14 @@ proc surveymeans data=pt_2 mean stderr clm;
         Xerostomia 
         Caries_YN 
         Missing_Teeth_YN;
-    title "Weighted Descriptive Statistics of Predictors for eligible people";
+    title "Weighted Descriptive Statistics of Predictors for disab_salty_all";
 run;
 
-proc surveymeans data=pt_2 mean stderr clm;
-	where elig=1;
-    strata sdmvstra;
-    cluster sdmvpsu;
-    weight wtmec2yr;
-    domain disab_bit_all;
-    var 
-        female 
-        edu 
-        pirg4 
-        race 
-        race3 
-        BMI_category 
-        Diabetes_status 
-        Ever_Smoker 
-        Binge_Drinking 
-        Marital_Status 
-        Xerostomia 
-        Caries_YN 
-        Missing_Teeth_YN;
-    title "Weighted Descriptive Statistics of Predictors for eligible people";
-run;
+/* do surveyfreq and logistic according to the PPT instructions by Dr. Lin 04/21 MT */
+/* Clean and add medicaiton predictor and age  */
+/* hpv_g3 outcome for surveymeans use where outcome =1 and for surveyfreq follow the code in the ppt */
+/* df=infinity check with or without and check which is accurate */
+
 
 
   /*============================================*/
@@ -891,10 +874,15 @@ proc freq data=pt_2;
 run;
 
 /*Medications analysis*/
-
-proc freq data=pt_2 order=freq;
-tables RXDDRUG;
-run;
+/*  */
+/* proc freq data=permdata.rxq_rx_h; */
+/*     tables RXDDRUG / nocum nopercent; */
+/*     where index(upcase(RXDDRUG), 'ATENO') > 0; */
+/* run; */
+/*  */
+/* proc freq data=pt_2 order=freq; */
+/* tables RXDDRUG; */
+/* run; */
 
 
  /*============================================*/
