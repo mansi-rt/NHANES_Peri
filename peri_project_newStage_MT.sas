@@ -16,7 +16,7 @@ NHANES peri questions are for age >=30
 
 /** LinHY, set up missing **/; 
 
-libname permdata 'T:\LinHY_project\NHANES\oral_health\data';
+libname permdata '/home/u49748641/LSU/Peri Project';
 
 /*============================================*/
 /* SECTION 1 : MACROS TO SET UP DATA          */
@@ -117,7 +117,7 @@ proc sort data=permdata.ohxper_h;
  by SEQN;
 run;
 
-proc sort data=permdata.ohxper_h;
+proc sort data=permdata.ohxden_h;
  by SEQN;
 run;
 
@@ -539,6 +539,9 @@ However, this person did not have taste variables, so was excluced from the anal
  n=2155 with valid data in peri status and taste results 
  ********/;
 
+
+******* USE THIS ONE FOR UNWEIGHTED WHERE WE HAVE SUBSET OF ELIGIBLE PEOPLE************;
+/*
 data pt;
  set peri_all;
   
@@ -549,7 +552,21 @@ data pt;
  if peri_g2=. then delete;
  if remaining_teeth_p28>=2 ;
 run;
+*/
 
+******* USE THIS ONE FOR WEIGHTED WHERE WE HAVE ALL PEOPLE WITH ELIG = 1 OR 0 ************;
+
+data pt;
+    set peri_all;
+
+    if age >= 40 and 
+       (disab_salty_all ne . or disab_bit_all ne .) and 
+       peri_g2 ne . and 
+       remaining_teeth_p28 >= 2 then elig = 1;
+    else elig = 0;
+run;
+
+* SORTING *;
 proc sort data=pt;
    by SEQN;
    run;
@@ -561,7 +578,7 @@ proc sort data=permdata.bmx_h;
 proc sort data=permdata.diq_h;
    by SEQN;
    run;
-proc sort data=permdata.diq_h;
+proc sort data=permdata.alq_h;
    by SEQN;
    run;
 proc sort data=permdata.smq_h;
@@ -587,7 +604,8 @@ proc sort data=permdata.csq_h;
 /** Merge all required datasets **/;
 data pt_2a;
     merge pt(in=a) permdata.bmx_h(in=b) permdata.alq_h(in=c) permdata.diq_h(in=d) permdata.smq_h(in=e)
-            permdata.csq_h   permdata.ohq_h permdata.ohxper_h   permdata.rxq_rx_h ;
+            permdata.csq_h   permdata.ohq_h;
+            * permdata.rxq_rx_h ;
     by SEQN;
     if a; /* Keep only those in pt */
 run;
@@ -614,8 +632,8 @@ run;
 /* Creating recoded dataset with new variables for demographic covariates */
 
 data pt_2;
-    set permdata.peri_taste_n2155_250414;
-
+ *   set permdata.peri_taste_n2155_250414;
+	set pt_2a;
     /* Recoding gender */
     if RIAGENDR = . then female = .;
     else if RIAGENDR = 2 then female = 1;
@@ -771,9 +789,65 @@ proc freq data=pt_2;
     title 'Check Race Recode: RIDRETH1 vs. race3 3-group: 1=White, 2=Black, 3=Hispanic/Other';
 run;
 
+/*============================================*/
+/* SECTION 5 : WEIGHTING */
+/*============================================*/
+
+proc freq data=pt_2;
+	tables elig;
+run;
+
+* The above works as elig (1) = 2155*;
+
+proc surveymeans data=pt_2 mean stderr clm;
+	where elig=1;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    weight wtmec2yr;
+    domain disab_salty_all;
+    var 
+        female 
+        edu 
+        pirg4 
+        race 
+        race3 
+        BMI_category 
+        Diabetes_status 
+        Ever_Smoker 
+        Binge_Drinking 
+        Marital_Status 
+        Xerostomia 
+        Caries_YN 
+        Missing_Teeth_YN;
+    title "Weighted Descriptive Statistics of Predictors for eligible people";
+run;
+
+proc surveymeans data=pt_2 mean stderr clm;
+	where elig=1;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    weight wtmec2yr;
+    domain disab_bit_all;
+    var 
+        female 
+        edu 
+        pirg4 
+        race 
+        race3 
+        BMI_category 
+        Diabetes_status 
+        Ever_Smoker 
+        Binge_Drinking 
+        Marital_Status 
+        Xerostomia 
+        Caries_YN 
+        Missing_Teeth_YN;
+    title "Weighted Descriptive Statistics of Predictors for eligible people";
+run;
+
 
   /*============================================*/
-/* SECTION 5 : FREQUENCY TABLES */
+/* SECTION 6 : FREQUENCY TABLES */
 /*============================================*/
 
 /**************************** FREQUENCY TABLES ***********************************/
