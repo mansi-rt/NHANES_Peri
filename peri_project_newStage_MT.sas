@@ -790,7 +790,90 @@ proc freq data=pt_2;
 run;
 
 /*============================================*/
-/* SECTION 5 : WEIGHTING */
+/* SECTION 5 : MEDICATIONS */
+/*============================================*/
+
+/* Create a medication flag per drug record */
+data meds_flag;
+    set permdata.rxq_rx_h;
+    rxdrug_upper = upcase(RXDDRUG); /* Convert drug names to uppercase for consistent matching */
+
+    /* Initialize */
+    medflag = 0;
+
+    /* Flagging if drug name matches any xerostomia-causing drug */
+    if index(rxdrug_upper, "PSEUDOEPHEDRINE") > 0 or
+       index(rxdrug_upper, "DIPHENHYDRAMINE") > 0 or
+       index(rxdrug_upper, "AMITRIPTYLINE") > 0 or
+       index(rxdrug_upper, "ATROPINE") > 0 or
+       index(rxdrug_upper, "HYDROCHLOROTHIAZIDE") > 0 or
+       index(rxdrug_upper, "FUROSEMIDE") > 0 or
+       index(rxdrug_upper, "METOPROLOL") > 0 or
+       index(rxdrug_upper, "AMLODIPINE") > 0 or
+       index(rxdrug_upper, "FELODIPINE") > 0 or
+       index(rxdrug_upper, "DILTIAZEM") > 0 or
+       index(rxdrug_upper, "PROMETHAZINE") > 0 or
+       index(rxdrug_upper, "HYDROXYZINE") > 0 or
+       index(rxdrug_upper, "HYDRALAZINE") > 0 or
+       index(rxdrug_upper, "CHLORPHENIRAMINE") > 0 or
+       index(rxdrug_upper, "CITALOPRAM") > 0 or
+       index(rxdrug_upper, "DULOXETINE") > 0 or
+       index(rxdrug_upper, "FLUOXETINE") > 0 or
+       index(rxdrug_upper, "PAROXETINE") > 0 or
+       index(rxdrug_upper, "SERTRALINE") > 0 or
+       index(rxdrug_upper, "VENLAFAXINE") > 0 or
+       index(rxdrug_upper, "GABAPENTIN") > 0 or
+       index(rxdrug_upper, "LITHIUM") > 0 or
+       index(rxdrug_upper, "ALBUTEROL") > 0 or
+       index(rxdrug_upper, "CYCLOBENZAPRINE") > 0 or
+       index(rxdrug_upper, "TIZANIDINE") > 0 or
+       index(rxdrug_upper, "AMPHETAMINE") > 0 or
+       index(rxdrug_upper, "CLONIDINE") > 0 or
+       index(rxdrug_upper, "BUPROPION") > 0 or
+       index(rxdrug_upper, "OMEPRAZOLE") > 0 or
+       index(rxdrug_upper, "TIMOLOL") > 0 or
+       index(rxdrug_upper, "BACLOFEN") > 0 or
+       index(rxdrug_upper, "ALENDRONATE") > 0 or
+       index(rxdrug_upper, "ARIPIPRAZOLE") > 0 or
+       index(rxdrug_upper, "ZOLPIDEM") > 0 or
+       index(rxdrug_upper, "IMIPRAMINE") > 0 or
+       index(rxdrug_upper, "ESCITALOPRAM") > 0 or
+       index(rxdrug_upper, "BRIMONIDINE") > 0
+    then medflag = 1;
+run;
+
+/* Collapse to one row per SEQN */
+proc sql;
+    create table meds_summary as
+    select SEQN,
+           max(medflag) as med_yn
+    from meds_flag
+    group by SEQN;
+quit;
+
+data pt_2;
+    merge pt_2(in=a) meds_summary(in=b);
+    by SEQN;
+    if a; /* keep only people from pt_2 */
+run;
+
+proc freq data=pt_2;
+    tables med_yn / missing;
+    title "Frequency of Xerostomia-causing Drug Use (med_yn)";
+run;
+
+proc freq data=pt_2;
+    tables elig * med_yn / missing;
+    title "Frequency of Xerostomia-causing Drug Use by Eligibility";
+run;
+
+/* New permanent dataset with all ineligible people also */
+data permdata.peri_taste_n10175_250427;
+	set pt_2;
+	run;
+	
+/*============================================*/
+/* SECTION 6 : WEIGHTING */
 /*============================================*/
 
 proc freq data=pt_2;
@@ -799,38 +882,169 @@ run;
 
 * The above works as elig (1) = 2155*;
 
+************************* ONLY ELIG STATS - NO OUTCOMES ***************************;
+/* PROC SURVEYMEANS for continuous variables */
 proc surveymeans data=pt_2 mean stderr clm;
-	where disab_salty_all = 1;
     strata sdmvstra;
     cluster sdmvpsu;
     weight wtmec2yr;
     domain elig;
-    var 
-        female 
-        edu 
-        pirg4 
-        race 
-        race3 
-        BMI_category 
-        Diabetes_status 
-        Ever_Smoker 
-        Binge_Drinking 
-        Marital_Status 
-        Xerostomia 
-        Caries_YN 
-        Missing_Teeth_YN;
-    title "Weighted Descriptive Statistics of Predictors for disab_salty_all";
+    var age; /* Add other continuous variables if needed later */
+    title "Weighted Descriptive Statistics for Continuous Variables among Eligible Participants";
 run;
 
-/* do surveyfreq and logistic according to the PPT instructions by Dr. Lin 04/21 MT */
-/* Clean and add medicaiton predictor and age  */
-/* hpv_g3 outcome for surveymeans use where outcome =1 and for surveyfreq follow the code in the ppt */
-/* df=infinity check with or without and check which is accurate */
+/* PROC SURVEYFREQ for categorical variables */
 
+/* Macro to automate surveyfreq for categorical variables */
+%macro sfreq(var);
+    proc surveyfreq data=pt_2;
+        strata sdmvstra;
+        cluster sdmvpsu;
+        weight wtmec2yr;
+        tables elig * &var. / row chisq;
+        where elig = 1;
+        title "Weighted Frequency of &var among Eligible Participants";
+    run;
+%mend sfreq;
 
+/* Call macro separately for each categorical variable */
+%sfreq(female);
+%sfreq(edu);
+%sfreq(pirg4);
+%sfreq(race);
+%sfreq(race3);
+%sfreq(BMI_category);
+%sfreq(Diabetes_status);
+%sfreq(Ever_Smoker);
+%sfreq(Binge_Drinking);
+%sfreq(Marital_Status);
+%sfreq(Xerostomia);
+%sfreq(Caries_YN);
+%sfreq(Missing_Teeth_YN);
+%sfreq(med_yn);
 
-  /*============================================*/
-/* SECTION 6 : FREQUENCY TABLES */
+************************* ELIG STATS - WITH OUTCOMES ***************************;
+
+/* Weighted Descriptive Statistics by Salty and Bitter Outcomes (using pt_2) */
+
+/* PROC SURVEYMEANS for Continuous Variable (Age) by Salty Outcome */
+proc surveymeans data=pt_2 mean stderr clm;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    weight wtmec2yr;
+    domain elig*disab_salty_all;
+    where elig = 1;
+    var age;
+    title "Weighted Means of Age by Salty Taste Disability (Eligible Participants)";
+run;
+
+/* PROC SURVEYMEANS for Continuous Variable (Age) by Bitter Outcome */
+proc surveymeans data=pt_2 mean stderr clm;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    weight wtmec2yr;
+    domain elig*disab_bit_all;
+    where elig = 1;
+    var age;
+    title "Weighted Means of Age by Bitter Taste Disability (Eligible Participants)";
+run;
+
+/* Macros for Categorical Variables */
+
+/* Macro for Categorical Variables by Salty Outcome */
+%macro sfreq_salty(var);
+    proc surveyfreq data=pt_2;
+        strata sdmvstra;
+        cluster sdmvpsu;
+        weight wtmec2yr;
+        tables elig * disab_salty_all * &var. / row chisq;
+        where elig = 1;
+        title "Weighted Frequency of &var by Salty Taste Disability (Eligible Participants)";
+    run;
+%mend sfreq_salty;
+
+/* Macro for Categorical Variables by Bitter Outcome */
+%macro sfreq_bitter(var);
+    proc surveyfreq data=pt_2;
+        strata sdmvstra;
+        cluster sdmvpsu;
+        weight wtmec2yr;
+        tables elig * disab_bit_all * &var. / row chisq;
+        where elig = 1;
+        title "Weighted Frequency of &var by Bitter Taste Disability (Eligible Participants)";
+    run;
+%mend sfreq_bitter;
+
+/* Running All Categorical Variables */
+
+/* Run for Salty Outcome */
+%sfreq_salty(female);
+%sfreq_salty(edu);
+%sfreq_salty(pirg4);
+%sfreq_salty(race);
+%sfreq_salty(race3);
+%sfreq_salty(BMI_category);
+%sfreq_salty(Diabetes_status);
+%sfreq_salty(Ever_Smoker);
+%sfreq_salty(Binge_Drinking);
+%sfreq_salty(Marital_Status);
+%sfreq_salty(Xerostomia);
+%sfreq_salty(Caries_YN);
+%sfreq_salty(Missing_Teeth_YN);
+%sfreq_salty(med_yn);
+
+/* Run for Bitter Outcome */
+%sfreq_bitter(female);
+%sfreq_bitter(edu);
+%sfreq_bitter(pirg4);
+%sfreq_bitter(race);
+%sfreq_bitter(race3);
+%sfreq_bitter(BMI_category);
+%sfreq_bitter(Diabetes_status);
+%sfreq_bitter(Ever_Smoker);
+%sfreq_bitter(Binge_Drinking);
+%sfreq_bitter(Marital_Status);
+%sfreq_bitter(Xerostomia);
+%sfreq_bitter(Caries_YN);
+%sfreq_bitter(Missing_Teeth_YN);
+%sfreq_bitter(med_yn);
+
+proc surveylogistic data=pt_2;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    weight wtmec2yr;
+    domain elig;
+    class female(ref='0') edu(ref='3') pirg4(ref='4') race(ref='1') race3(ref='1')
+          BMI_category(ref='1') Diabetes_status(ref='2') Ever_Smoker(ref='1') 
+          Binge_Drinking(ref='0') Marital_Status(ref='1') Xerostomia(ref='0')
+          Caries_YN(ref='0') Missing_Teeth_YN(ref='0') med_yn(ref='0') / param=ref;
+    model disab_salty_all(event='1') = 
+          age 
+          female edu pirg4 race race3 BMI_category Diabetes_status 
+          Ever_Smoker Binge_Drinking Marital_Status Xerostomia 
+          Caries_YN Missing_Teeth_YN med_yn/ link=logit df=infinity;;
+    title "Survey Logistic Regression: Salty Taste Disability (Eligible Participants)";
+run;
+
+proc surveylogistic data=pt_2;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    weight wtmec2yr;
+    domain elig;
+    class female(ref='0') edu(ref='3') pirg4(ref='4') race(ref='1') race3(ref='1')
+          BMI_category(ref='1') Diabetes_status(ref='2') Ever_Smoker(ref='1') 
+          Binge_Drinking(ref='0') Marital_Status(ref='1') Xerostomia(ref='0')
+          Caries_YN(ref='0') Missing_Teeth_YN(ref='0') med_yn(ref='0') / param=ref;
+    model disab_bit_all(event='1') = 
+          age 
+          female edu pirg4 race race3 BMI_category Diabetes_status 
+          Ever_Smoker Binge_Drinking Marital_Status Xerostomia 
+          Caries_YN Missing_Teeth_YN med_yn/ link=logit df=infinity;;
+    title "Survey Logistic Regression: Bitter Taste Disability (Eligible Participants)";
+run;
+
+/*============================================*/
+/* SECTION 7 : FREQUENCY TABLES */
 /*============================================*/
 
 /**************************** FREQUENCY TABLES ***********************************/
