@@ -1404,6 +1404,39 @@ proc contents data=logit_data;
                  race3(ref='1') female(ref='0') binge_alq_g3(ref='1') Smoker(ref='0');
 
 /* SET 1 - Salty disability ~ peri_g2 */
+%macro univariate_logit(var=, ref=);
+
+    %if %length(&ref) > 0 %then %do;
+        proc surveylogistic data=logit_data;
+            class &var(ref="&ref") / param=ref;
+            model disab_salty_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "Univariate Model: &var (ref=&ref)";
+        run;
+    %end;
+    %else %do;
+        proc surveylogistic data=logit_data;
+            model disab_salty_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "Univariate Model: &var (continuous)";
+        run;
+    %end;
+
+%mend;
+
+
+%univariate_logit(var=peri_g2, ref=0);
+%univariate_logit(var=race3, ref=1);
+%univariate_logit(var=female, ref=0);
+%univariate_logit(var=binge_alq_g3, ref=1);
+%univariate_logit(var=Smoker, ref=0);
+%univariate_logit(var=age, ref=);   /* no reference, continuous */
+
+
 proc surveylogistic data=logit_data;
     class &classvars / param=ref;
     model disab_salty_all(event='1') = peri_g2 age race3 female binge_alq_g3 Smoker;
@@ -1414,33 +1447,125 @@ proc surveylogistic data=logit_data;
 run;
 
 /* SET 2 - Salty disability ~ peri_stage_4vs23 */
+%macro univariate_logit_step2(var=, ref=);
+    %if %length(&ref) > 0 %then %do;
+        proc surveylogistic data=logit_data;
+            class &var(ref="&ref") / param=ref;
+            model disab_salty_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "Step 2 Univariate Model: &var (ref=&ref)";
+        run;
+    %end;
+    %else %do;
+        proc surveylogistic data=logit_data;
+            model disab_salty_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "Step 2 Univariate Model: &var (continuous)";
+        run;
+    %end;
+%mend;
+
+/* Run each predictor */
+%univariate_logit_step2(var=age, ref=);
+%univariate_logit_step2(var=race3, ref=1);
+%univariate_logit_step2(var=female, ref=0);
+%univariate_logit_step2(var=Smoker, ref=0);
+%univariate_logit_step2(var=binge_alq_g3, ref=1);
+%univariate_logit_step2(var=peri_stage_4vs23, ref=0);
+
 proc surveylogistic data=logit_data;
-    class &classvars / param=ref;
-    model disab_salty_all(event='1') = peri_stage_4vs23 age race3 female binge_alq_g3 Smoker;
+    class race3(ref='1') female(ref='0') Smoker(ref='0') binge_alq_g3(ref='1') peri_stage_4vs23(ref='0') / param=ref;
+    model disab_salty_all(event='1') = age race3 female Smoker binge_alq_g3 peri_stage_4vs23;
     weight wtmec2yr;
     strata sdmvstra;
     cluster sdmvpsu;
-    title "SET 2: Salty disability ~ peri_stage_4vs23 adjusted for age, race, sex, binge, smoking";
+    title "Step 2 Multivariable Logistic Model: Salty Disability ~ Peri Stage (4 vs 2–3)";
 run;
 
 /* SET 3 - Bitter disability ~ peri_g2 */
+
+%macro univariate_logit_step3(var=, ref=);
+    %if %length(&ref) > 0 %then %do;
+        proc surveylogistic data=logit_data;
+            class &var(ref="&ref") / param=ref;
+            model disab_bit_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "SET 3 Univariate Model: &var (ref=&ref)";
+        run;
+    %end;
+    %else %do;
+        proc surveylogistic data=logit_data;
+            model disab_bit_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "SET 3 Univariate Model: &var (continuous)";
+        run;
+    %end;
+%mend;
+
+/* Call macro for each predictor */
+%univariate_logit_step3(var=age, ref=);
+%univariate_logit_step3(var=race3, ref=1);
+%univariate_logit_step3(var=female, ref=0);
+%univariate_logit_step3(var=Smoker, ref=0);
+%univariate_logit_step3(var=binge_alq_g3, ref=1);
+%univariate_logit_step3(var=peri_g2, ref=0);
+
 proc surveylogistic data=logit_data;
-    class &classvars / param=ref;
-    model disab_bit_all(event='1') = peri_g2 age race3 female binge_alq_g3 Smoker;
+    class race3(ref='1') female(ref='0') Smoker(ref='0') binge_alq_g3(ref='1') peri_g2(ref='0') / param=ref;
+    model disab_bit_all(event='1') = age race3 female Smoker binge_alq_g3 peri_g2;
     weight wtmec2yr;
     strata sdmvstra;
     cluster sdmvpsu;
-    title "SET 3: Bitter disability ~ peri_g2 adjusted for age, race, sex, binge, smoking";
+    title "SET 3 Multivariable Logistic Model: Bitter Disability ~ peri_g2 + covariates";
 run;
 
 /* SET 4 - Bitter disability ~ peri_stage_4vs23 */
+%macro univariate_logit_step4(var=, ref=);
+    %if %length(&ref) > 0 %then %do;
+        proc surveylogistic data=logit_data;
+            class &var(ref="&ref") / param=ref;
+            model disab_bit_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "Step 4 Univariate Model: &var (ref=&ref)";
+        run;
+    %end;
+    %else %do;
+        proc surveylogistic data=logit_data;
+            model disab_bit_all(event='1') = &var;
+            weight wtmec2yr;
+            strata sdmvstra;
+            cluster sdmvpsu;
+            title "Step 4 Univariate Model: &var (continuous)";
+        run;
+    %end;
+%mend;
+
+/* Run univariate models */
+%univariate_logit_step4(var=age, ref=);
+%univariate_logit_step4(var=race3, ref=1);
+%univariate_logit_step4(var=female, ref=0);
+%univariate_logit_step4(var=Smoker, ref=0);
+%univariate_logit_step4(var=binge_alq_g3, ref=1);
+%univariate_logit_step4(var=peri_stage_4vs23, ref=0);
+
+
 proc surveylogistic data=logit_data;
-    class &classvars / param=ref;
-    model disab_bit_all(event='1') = peri_stage_4vs23 age race3 female binge_alq_g3 Smoker;
+    class race3(ref='1') female(ref='0') Smoker(ref='0') binge_alq_g3(ref='1') peri_stage_4vs23(ref='0') / param=ref;
+    model disab_bit_all(event='1') = age race3 female Smoker binge_alq_g3 peri_stage_4vs23;
     weight wtmec2yr;
     strata sdmvstra;
     cluster sdmvpsu;
-    title "SET 4: Bitter disability ~ peri_stage_4vs23 adjusted for age, race, sex, binge, smoking";
+    title "Step 4 Multivariable Model: Bitter Disability ~ Peri Stage + Covariates";
 run;
 
 /*============================================*/
