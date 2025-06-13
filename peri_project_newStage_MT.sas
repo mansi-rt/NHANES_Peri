@@ -3,7 +3,6 @@ use NHANES 2013-2014 data
 Assign a permanent library to the folder where you want to save the .sas7bdat files 
 
 /*
-LinHY, 12/21/2024
 From PI
 PERIODONTITIS is defined based on following criteria for ATTACHMENT LOSS, PROBING DEPTH:
 •	Attachment loss of 1 mm or more on at least 2 teeth (even 1 surface/ tooth counts but only surfaces of interest are DF, MF, DL and ML) with PD (pocket depth) 4 mm or 
@@ -14,7 +13,8 @@ PERIODONTITIS is defined based on following criteria for ATTACHMENT LOSS, PROBIN
 NHANES peri questions are for age >=30
 */
 
-/** LinHY, set up missing **/; 
+/** set up missing **/; 
+/* libname permdata 'T:\LinHY_project\NHANES\oral_health\data'; */
 
 libname permdata '/home/u49748641/LSU/Peri Project';
 
@@ -55,7 +55,7 @@ libname permdata '/home/u49748641/LSU/Peri Project';
 /* Creating a periodontitis variable for the specific tooth 
 	Adding the missing variable value */
 
-/** 12/23/2024, LinHY 
+/** 
 A tooth that follows both of the following 2 criteria will be considered a PERIODONTITIS symptom for this tooth. Is this correct? 
 1. At least 1 out of the 4 surfaces (DF, MF, DL, and ML) with attachment loss >= 1 mm
 2.  At least 1 out of the 4 surfaces (DF, MF, DL, and ML) with PD >= 4 mm
@@ -554,6 +554,64 @@ data pt;
 run;
 */
 
+ 
+/*============================================*/
+/* SECTION 5 : MEDICATIONS */
+/*============================================*/
+
+/* Create a medication flag per drug record 
+data meds_flag;
+    set permdata.rxq_rx_h;
+ 
+
+	label ;
+run;*/
+/*
+proc sql;
+    create table meds_summary as
+    select SEQN,
+           max(medflag) as med_yn
+    from meds_flag
+    group by SEQN;
+quit;
+*/;
+
+ /*
+5/16/2025, LinHY, 
+both files only have 1 row per person, so no need to collapse
+ 
+permdata.rxq_rx_h, n=10175 
+ meds_summary: n=10175
+ ***/;
+ /*
+proc freq data=meds_flag;
+ table medflag;
+ run;
+proc freq data=meds_summary;
+ table med_yn;
+ run;
+proc sort data=meds_summary;
+ by seqn;
+ run;
+
+ data chk;
+  *set meds_summary;
+  set meds_flag;
+ by seqn;
+ if first.seqn;
+ run;
+
+proc contents data=meds_summary;
+run;
+ */;
+
+/*
+data pt_2;
+    merge pt_2(in=a) meds_summary(in=b);
+    by SEQN;
+    if a; 
+run;
+***/;
 ******* USE THIS ONE FOR WEIGHTED WHERE WE HAVE ALL PEOPLE WITH ELIG = 1 OR 0 ************;
 
 data pt;
@@ -601,10 +659,15 @@ proc sort data=permdata.csq_h;
  by seqn;
  run;
 
+ proc sort data=permdata.rxq_rx_h;
+ by seqn;
+ run;
+ 
+
 /** Merge all required datasets **/;
 data pt_2a;
     merge pt(in=a) permdata.bmx_h(in=b) permdata.alq_h(in=c) permdata.diq_h(in=d) permdata.smq_h(in=e)
-            permdata.csq_h   permdata.ohq_h;
+            permdata.csq_h   permdata.ohq_h permdata.rxq_rx_h;
             * permdata.rxq_rx_h ;
     by SEQN;
     if a; /* Keep only those in pt */
@@ -616,24 +679,43 @@ proc freq data=pt_2a;
  run;
 
 /***
-data permdata.peri_taste_n2155_250414;
+ <previous>
+*data permdata.peri_taste_n2155_250414;
+*permdata.peri_taste_n10175_250427;
+
+
+ <New, n=10175, the whole dataset, add meds_flag>
+ data permdata.peri_taste_n10175_250516;
  set pt_2a;
  run;
 
 <use>
-data pt_2;
- set permdata.peri_taste_n2155_250414;
+data pt_2a;
+ set permdata.peri_taste_n10175_250516;
 run;
 *******/;
+
 
 /*============================================*/
 /* SECTION 4 : pt_2 Recoding & labeling peri_all with new coding methods */
 /*============================================*/
 /* Creating recoded dataset with new variables for demographic covariates */
 
+	/* LinHY edited 5/1/2025 - Mansi reviewed - OK 5/6/2025 */
+ data pt_2a_n;
+  set pt_2a;
+   rename  OHX02CTC= OHX2CTC OHX03CTC= OHX3CTC OHX04CTC= OHX4CTC OHX05CTC= OHX5CTC
+       OHX06CTC= OHX6CTC OHX07CTC= OHX7CTC OHX08CTC= OHX8CTC  OHX09CTC= OHX9CTC
+	   ;
+	   run;
+
+
+
 data pt_2;
  *   set permdata.peri_taste_n2155_250414;
-	set pt_2a;
+	set pt_2a_n;
+
+	*set permdata.peri_taste_n10175_250427;
     /* Recoding gender */
     if RIAGENDR = . then female = .;
     else if RIAGENDR = 2 then female = 1;
@@ -648,8 +730,8 @@ data pt_2;
     /* Recoding poverty index */
     if INDFMPIR = . then pirg4 = .;
     else if INDFMPIR <= 1 then pirg4 = 1;
-    else if INDFMPIR <= 2 then pirg4 = 2;
-    else if INDFMPIR <= 4 then pirg4 = 3;
+    else if 1 < INDFMPIR <= 2 then pirg4 = 2;
+    else if 2 < INDFMPIR <= 4 then pirg4 = 3;
     else pirg4 = 4;
 
     /* Recoding race */
@@ -673,18 +755,138 @@ data pt_2;
     /* Diabetes */
     if DIQ010 = . then Diabetes_status = .;
     else if DIQ010 = 1 then Diabetes_status = 1; 
-    else if DIQ010 = 2 then Diabetes_status = 2; 
-    else if DIQ010 = 3 then Diabetes_status = 3; 
+    else if DIQ010 = 2 or DIQ010 = 3 then Diabetes_status = 0;
 
-    /* Smoking */
-    if SMQ020 = . then Ever_Smoker = .;
-    else if SMQ020 = 1 then Ever_Smoker = 1; 
-    else if SMQ020 in (2, 3) then Ever_Smoker = 2; 
+    /* Smoking taken from LinHY code antiox */
+ if smq020=7 or smq020=9 or smq020=. then Ever_Smoker=.;
+ else if smq020=2 then Ever_Smoker=0;
+ else Ever_Smoker=1;
+
+ if smq040=7 or smq040=9 or smq040=. then Now_Smoker=.;
+ else if smq040=3 then Now_Smoker=0;
+ else Now_Smoker=1;
+
+ if Ever_Smoker=0 then Smoker=0;
+ else if Ever_Smoker=1 and Now_Smoker=0 then Smoker=1;
+ else if Ever_Smoker=1 and Now_Smoker=1 then Smoker=2;
+ else Smoker=.;
+
+/* 5/6/25 MT make this in two parts. every smoker 1-0(above is correct) current smoker (1-0) and then smoker 1,2,3 - never former current */
+/*	if SMQ020 = 2 then Smoker = 1;*/
+/*    else if SMQ020 = 1 then  = 2; */
+/*    else if SMQ040 in 1 then  = 3; */
 
     /* Binge Drinking */
-    if ALQ151 = . then Binge_Drinking = .;
-    else if ALQ151 = 1 then Binge_Drinking = 1;
-    else if ALQ151 = 2 then Binge_Drinking = 0;
+	/*
+LinHY: use wrong variable, should use (ALQ101, ALQ110 and ALQ160)
+
+	https://www.niaaa.nih.gov/publications/brochures-and-fact-sheets/binge-drinking
+The NIAAA defines binge drinking as a pattern of drinking alcohol that brings blood alcohol concentration (BAC) to 0.08%–or 0.08 grams of alcohol per deciliter
+	–or higher. 
+	For a typical adult, this pattern corresponds to consuming >=5 drinks (male), or >=4 drinks (female), in about two hours
+
+	ALQ101 - Had at least 12 alcohol drinks/1 yr? 1: yes, 2: no, 7/9/. 
+	ALQ110	Had at least 12 alcohol drinks/lifetime?
+    ALQ160	# days have 4/5 or more drinks in 2 hrs
+
+	***/;
+
+/** 5/13/2025, linhy added */
+
+if ALQ101=. or ALQ101=7 or ALQ101=9 then alq_p1yr=.;
+else if ALQ101=1 then alq_p1yr=1;
+else alq_p1yr=0;
+
+if ALQ110=. or ALQ110=7 or ALQ110=9 then alq_life=.;
+else if ALQ110=1 then alq_life=1;
+else alq_life=0;
+
+if ALQ160=. or ALQ160=777 or ALQ160=999 then day_binge_g2=.;
+else if alq160=0 then day_binge_g2=0;
+else day_binge_g2=1;
+
+if alq_p1yr=. then alq_g3=.;
+else if alq_p1yr=1 then alq_g3=3;
+else if alq_p1yr=0 then do;
+   if alq_life=. then alq_g3=.;
+  else if alq_life=0 then alq_g3=1;
+  else if alq_life=1 then alq_g3=2;
+end;
+
+if alq_g3=. then binge_alq_g3=.;
+else if alq_g3=1 then binge_alq_g3=1;
+else do; 
+  if day_binge_g2=. then binge_alq_g3=.;
+  else if day_binge_g2=0 then binge_alq_g3=2;
+  else binge_alq_g3=3;
+ end;
+
+ /* 
+ ALQ141Q='# days have 4/5 drinks - past 12 mos, 777/999/.: mising'
+ALQ141U='unit, 4/5 drinks past 12 mos, 1:week, 2:month, 3:year, 7/9/.: missing'
+ALQ151='Ever have 4/5 or more drinks every day?, 1:yes, 2:no, 7/9/.: missing'
+
+ if ALQ151 in (7, 9, .) then hvy_alq=.;
+ else if ALQ151=1 then hvy_alq=1;
+ else if ALQ151=2 then hvy_alq=0;
+
+ Heavy Drinking
+
+ */
+
+ 
+/* Creating Heavy_Drinking 
+ 
+NIAAA defines heavy drinking as follows:
+For men, consuming >=5 drinks on any day or >=15 per week
+For women, consuming >=4 on any day or >=8 drinks per week
+ */
+
+
+
+  if ALQ141Q in (777, 999, .) then ALQ141Q_n=.;
+ else ALQ141Q_n= ALQ141Q ;
+
+ if ALQ141U in (7, 9, .) then ALQ141U_n=.;
+ else ALQ141U_n= ALQ141U ;
+
+/** not consider never drinker */
+ if ALQ141Q_n=.  then hvy_alq_12m=.;
+ else if ALQ141Q_n=0  then hvy_alq_12m=0;
+ else hvy_alq_12m=1;
+
+ /** consider never drinker */
+if alq_g3=. then hvy_alq_g3=.;
+else if alq_g3=1 then hvy_alq_g3=1;
+else do; 
+  if hvy_alq_12m=. then hvy_alq_g3=.;
+  else if hvy_alq_12m=0 then hvy_alq_g3=2;
+  else hvy_alq_g3=3;
+ end;
+
+ /*
+ <MT version>
+if ALQ141Q in (777, 999, .) or ALQ141U in (7, 9, .) or RIAGENDR in (., 7, 9) then Heavy_Drinking = .;
+else do;
+    if RIAGENDR = 2 then do; 
+        if (ALQ141U = 2 and ALQ141Q >= 8) or (ALQ141U = 1 and ALQ141Q >= 4) then Heavy_Drinking = 1;
+        else Heavy_Drinking = 0;
+    end;
+    else if RIAGENDR = 1 then do; 
+        if (ALQ141U = 2 and ALQ141Q >= 15) or (ALQ141U = 1 and ALQ141Q >= 5) then Heavy_Drinking = 1;
+        else Heavy_Drinking = 0;
+    end;
+end;
+*/
+
+	/* Creating Binge_Drinking MT cross-check 5/6/25 */
+	/* Also make a never, former, current ALQ variable 5/6/25*/
+ /*
+	if ALQ101 in (7, 9, .) then Binge_Drinking = .;
+	else if ALQ101 = 1 and ALQ110 = 1 and ALQ160 >= 1 then Binge_Drinking = 1;
+	else if ALQ101 = 1 and ALQ110 = 1 and ALQ160 = 0 then Binge_Drinking = 0;
+	else Binge_Drinking = .;
+*/;
 
     /* Marital Status */
     if DMDMARTL = . then Marital_Status = .;
@@ -692,117 +894,47 @@ data pt_2;
     else if DMDMARTL in (2,3,4,5) then Marital_Status = 2; 
 
     /* Xerostomia */
-    if CSQ200 = . then Xerostomia = .;
-    else if CSQ200 = 1 then Xerostomia = 1;
-    else if CSQ200 = 2 then Xerostomia = 0;
+    if CSQ202 = . or CSQ202 = 9 then Xerostomia = .;
+    else if CSQ202 = 1 then Xerostomia = 1;
+    else if CSQ202 = 2 then Xerostomia = 0;
 
-	%macro check_caries;
-        Caries_Count = 0; 
-
+	/* LinHY edited 5/1/2025 - Mansi reviewed - OK 5/6/2025 */
+	%macro cari_ct;
+       
         %do i = 2 %to 15;
-            if OHX&i.CTC = 'Z' then Caries_Count + 1;
+		    if OHX&i.CTC = ' ' then C_&i.=. ;
+            else if OHX&i.CTC = 'Z' then C_&i.=1 ;
+			else C_&i.=0; 
         %end;
         %do i = 18 %to 31;
-            if OHX&i.CTC = 'Z' then Caries_Count + 1;
+           if OHX&i.CTC = ' ' then C_&i.=. ;
+            else if OHX&i.CTC = 'Z' then C_&i.=1 ;
+			else C_&i.=0; 
         %end;
+    %mend  cari_ct;
 
-        
-        if Caries_Count >= 1 then Caries_YN = 1;
+%cari_ct;
+
+c_count= c_2  + c_3 + c_4 + c_5  + c_6 + c_7 + c_8  + c_9 + c_10 + c_11+ c_12   + c_13 + c_14 + c_15 +
+         c_18  + c_19 + c_20 + c_21+ c_22   + c_23 + c_24 + c_25 +c_26 + c_27 + c_28  + c_29 + c_30 + c_31 ;
+
+
+        if C_Count=. then Caries_YN = .;
+        else if C_Count >= 1 then Caries_YN = 1;
         else Caries_YN = 0;
-    %mend check_caries;
 
-    /* Execute Macro for Caries */
-    %check_caries;
-
+	/* LinHY edited 5/1/2025 - Mansi reviewed - OK 5/6/2025 */
     /* --- Missing Teeth Yes/No --- */
-    if remaining_teeth < 28 then Missing_Teeth_YN = 1;
-    else if remaining_teeth >= 28 then Missing_Teeth_YN = 0;
-    else Missing_Teeth_YN = ''; /* Missing */
+   if remaining_teeth_p28=.  then Missing_Teeth_YN = .;
+   else if remaining_teeth_p28 < 28 then Missing_Teeth_YN = 1;
+   else if remaining_teeth_p28 = 28 then Missing_Teeth_YN = 0;
 
-   /* Labeling original variables used in recoding */
-    label
-        RIAGENDR = "Original Gender Variable (1=Male, 2=Female)"
-        DMDEDUC2 = "Education level (Adults 20+), 1: <9th, 2: 9-11th, 3: High school/GED, 4: Some college/AA, 5: College+"
-        INDFMPIR = "Family Income to Poverty Ratio"
-        RIDRETH1 = "Race/Hispanic Origin, 1:Mexican Am, 2:Other Hisp, 3:White, 4:Black, 5:Other";
+   rxdrug_upper = upcase(RXDDRUG); /* Convert drug names to uppercase for consistent matching */
 
-    /* Labels for recoded and derived variables, with value explanation */
-    label
-        female = "Binary gender recode: 1=Female, 0=Male"
-        edu = "Education recode: 1=Less than HS, 2=Some HS, 3=HS graduate or more"
-        pirg4 = "Poverty index recode: 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0"
-        race = "Race recode: 1=White, 2=Black, 3=Hispanic, 4=Other"
-        race3 = "Race recode 3-group: 1=White, 2=Black, 3=Hispanic/Other"
-		BMI_category = "BMI Category: 1=<25, 2=25-29.9, 3=30+"
-        Diabetes_status = "Diabetes Status: 1=Yes, 2=No, 3=Borderline"
-        Ever_Smoker = "Smoking Status: 1=Never, 2=Ever"
-        Binge_Drinking = "Binge Drinking: 1=Yes, 0=No"
-        Marital_Status = "Marital Status: 1=Married/Partnered, 2=Widowed/Divorced/Separated"
-        Xerostomia = "Xerostomia: 1=Yes, 0=No"
-		Caries_Count = "Count of Teeth with Caries (Z code in OHX*CTC)"
-        Missing_Teeth_YN = "Missing Teeth (Remaining < 28): 1 = Yes, 0 = No"
-        Caries_YN = "Dental Caries Presence: 1=Yes, 0=No (from OHX*CTC='Z')"
-;
-run;
-
-
-/* Task 3: Checking accuracy of recoded variables */
-
-proc freq data=pt_2;
-    tables female edu pirg4 race race3 / missing;
-run;
-
-
-proc freq data=pt_2;
-    tables 
-        BMI_category 
-        Diabetes_status 
-        Ever_Smoker 
-        Binge_Drinking 
-        Marital_Status 
-        Xerostomia 
-        Missing_Teeth_YN 
-        Caries_YN / missing list;
-run;
-
-/* Gender: RIAGENDR vs. female */
-proc freq data=pt_2;
-    tables RIAGENDR*female / missing list;
-    title 'Check Gender Recode: RIAGENDR vs. female 1=Female, 0=Male';
-run;
-
-/* Education: DMDEDUC2 vs. edu */
-proc freq data=pt_2;
-    tables DMDEDUC2*edu / missing list;
-    title 'Check Education Recode: DMDEDUC2 vs. edu 1=Less than HS, 2=Some HS, 3=HS graduate or more';
-run;
-
-/* Poverty index: INDFMPIR vs. pirg4 */
-proc freq data=pt_2;
-    tables pirg4 / missing;
-    title 'Check Poverty Grouping: pirg4 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0';
-run;
-
-/* Race: RIDRETH1 -> race and race3 */
-proc freq data=pt_2;
-    tables RIDRETH1*race3 / missing list;
-    title 'Check Race Recode: RIDRETH1 vs. race3 3-group: 1=White, 2=Black, 3=Hispanic/Other';
-run;
-
-/*============================================*/
-/* SECTION 5 : MEDICATIONS */
-/*============================================*/
-
-/* Create a medication flag per drug record */
-data meds_flag;
-    set permdata.rxq_rx_h;
-    rxdrug_upper = upcase(RXDDRUG); /* Convert drug names to uppercase for consistent matching */
-
-    /* Initialize */
-    medflag = 0;
-
+/* medicine add a missing category where if they have RXDDRUG=. or the 555 7777 - it is missing 5/6/25*/
     /* Flagging if drug name matches any xerostomia-causing drug */
-    if index(rxdrug_upper, "PSEUDOEPHEDRINE") > 0 or
+if rxdrug_upper in (' ', '55555','77777', '99999') then med_yn=.;
+else if index(rxdrug_upper, "PSEUDOEPHEDRINE") > 0 or
        index(rxdrug_upper, "DIPHENHYDRAMINE") > 0 or
        index(rxdrug_upper, "AMITRIPTYLINE") > 0 or
        index(rxdrug_upper, "ATROPINE") > 0 or
@@ -839,22 +971,176 @@ data meds_flag;
        index(rxdrug_upper, "IMIPRAMINE") > 0 or
        index(rxdrug_upper, "ESCITALOPRAM") > 0 or
        index(rxdrug_upper, "BRIMONIDINE") > 0
-    then medflag = 1;
+    then med_yn = 1;
+	else med_yn = 0;
+
+
+
+
+
+   /* Labeling original variables used in recoding */
+    label
+        RIAGENDR = "Original Gender Variable (1=Male, 2=Female)"
+        DMDEDUC2 = "Education level (Adults 20+), 1: <9th, 2: 9-11th, 3: High school/GED, 4: Some college/AA, 5: College+"
+        INDFMPIR = "Family Income to Poverty Ratio"
+        RIDRETH1 = "Race/Hispanic Origin, 1:Mexican Am, 2:Other Hisp, 3:White, 4:Black, 5:Other";
+
+    /* Labels for recoded and derived variables, with value explanation */
+    label
+        female = "Binary gender recode: 1=Female, 0=Male"
+        edu = "Education recode: 1=Less than HS, 2=Some HS, 3=HS graduate or more"
+        pirg4 = "Poverty index recode: 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0"
+        race = "Race recode: 1=White, 2=Black, 3=Hispanic, 4=Other"
+        race3 = "Race recode 3-group: 1=White, 2=Black, 3=Hispanic/Other"
+		BMI_category = "BMI Category: 1=<25, 2=25-29.9, 3=30+"
+        Diabetes_status = "Diabetes Status: 1=Yes, 0=No/Borderline"
+        Ever_Smoker = "Smoking Status Ever: 1=Yes, 0=No"
+		Now_Smoker = "Smoking Status Current: 1=Yes, 0=No"
+		Smoker = "Smoking Status: 0=Never, 1=Former, 2=Current"
+        Marital_Status = "Marital Status: 1=Married/Partnered, 2=Widowed/Divorced/Separated"
+        Xerostomia = "Xerostomia: 1=Yes, 0=No"
+		C_Count = "Count of Teeth with Caries (Z code in OHX*CTC)"
+        Missing_Teeth_YN = "Missing Teeth (Remaining < 28): 1 = Yes, 0 = No"
+        Caries_YN = "Dental Caries Presence: 1=Yes, 0=No (from OHX*CTC='Z')"
+		DMDMARTL="1 = Married, 2 = Widowed, 3 = Divorced, 4 = Separated, 5 = Never Married, 6 = Living with Partner"
+;
+/** 5/13/2025, linhy added */
+label 
+ALQ101='Had at least 12 alcohol drinks/1 yr?, 1:yes, 2: no, 7/9: missing'
+ALQ110='Had at least 12 alcohol drinks/lifetime?, 1:yes, 2: no, 7/9: missing'
+ALQ160='# days have 4/5 or more drinks in 2 hrs past 30 days, 0-30, 777/999:missing'
+ALQ141Q='# days have 4/5 drinks - past 12 mos, 777/999/.: mising'
+ALQ141U='unit, 4/5 drinks past 12 mos, 1:week, 2:month, 3:year, 7/9/.: missing'
+CSQ202='Had persistent dry mouth in past 12 mth, 1:yes, 2: no, 7/9: missing'
+
+alq_p1yr='Had at least 12 alcohol drinks/1 yr?, 1:yes, 0: no'
+alq_life='Had at least 12 alcohol drinks/lifetime?, 1:yes, 0: no'
+day_binge_g2='# days have 4/5 or more drinks in 2 hrs past 30 days, 0: 0, 1:>=1'
+alq_g3='alcohol intake, 1: never, 2: former, 3: current drinker'
+binge_alq_g3='alcohol binge, 1: never drinker, 2: non-binge, 3: binge'
+hvy_alq_12m='Ever have >=4/5 drinks past 12 mos, 1:yes, 0:no'
+hvy_alq_g3='heavy drink, >=4/5 drinks past 12 mos, 1: never drinker, 2: non-heavy, 3: heavy'
+med_yn='xerostomia-causing drug, 1: yes, 0:no'
+;
+run;
+/*
+
+*/; 
+proc freq data=pt_2;
+*tables Binge_Drinking;
+*table alq101 alq_p1yr alq110 alq_life alq160;
+*table alq160 day_binge_g2;
+*table alq_p1yr *alq_life alq_g3/missing;
+*table alq_g3* day_binge_g2 binge_alq_g3 Binge_Drinking/missing;
+*table DIQ010 Diabetes_status;
+*table smq020 Ever_Smoker smq040 Now_Smoker;
+* table Ever_Smoker* now_smoker Smoker/missing ;
+ * table ALQ141Q ALQ141Q_n  ALQ141U ALQ141U_n ;
+  *table ALQ141Q_n hvy_alq_12m;
+  *table (hvy_alq_12m hvy_alq_g3 binge_alq_g3)* alq_g3/missing;
+  *table hvy_alq_g3;
+  *table CSQ202 Xerostomia ;
+  table med_yn;
 run;
 
-/* Collapse to one row per SEQN */
-proc sql;
-    create table meds_summary as
-    select SEQN,
-           max(medflag) as med_yn
-    from meds_flag
-    group by SEQN;
-quit;
+/* proc freq data=permdata.peri_taste_n10175_250516; */
+/*  table alq141q; */
+/*  run; */
+/*
+           alcohol binge, 1: never drinker, 2: non-binge, 3: binge
 
-data pt_2;
-    merge pt_2(in=a) meds_summary(in=b);
-    by SEQN;
-    if a; /* keep only people from pt_2 */
+                                                        Cumulative    Cumulative
+               binge_alq_g3    Frequency     Percent     Frequency      Percent
+               ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ
+                          .        7373       72.46          7373        72.46
+                          1         938        9.22          8311        81.68
+                          2        1453       14.28          9764        95.96
+                          3         411        4.04         10175       100.00
+***/;
+
+/********
+LInHY, 5/1/2025 check 
+All major variables are consistent with prvious version. 
+
+
+                  periodontitis based on available teeth (max 28), 1:yes, 0:no
+
+                                                      Cumulative    Cumulative
+                  peri_g2    Frequency     Percent     Frequency      Percent
+                  ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ
+                        0        1507       69.93          1507        69.93
+                        1         648       30.07          2155       100.00
+
+
+                                    periodontitis stage, 1-4
+
+                                                        Cumulative    Cumulative
+               peri_stage_N    Frequency     Percent     Frequency      Percent
+               ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ
+                          2         122       18.83           122        18.83
+                          3         345       53.24           467        72.07
+                          4         181       27.93           648       100.00
+
+                                    Frequency Missing = 1507
+
+*********/;
+proc freq data=pt_2;
+ where elig=1;
+  table peri_g2 peri_stage_N;
+ table disab_salty_tp disab_salty_wm  disab_salty_all  disab_bit_tp disab_bit_wm disab_bit_all;
+  run;
+
+
+/* Task 3: Checking accuracy of recoded variables */
+
+proc freq data=pt_2;
+    tables female edu pirg4 race race3 / missing;
+run;
+
+
+proc freq data=pt_2;
+    tables 
+        BMI_category 
+        Diabetes_status 
+        Ever_Smoker 
+        binge_alq_g3 
+		alq_g3
+        Marital_Status 
+        Xerostomia 
+        Missing_Teeth_YN 
+        Caries_YN / missing list;
+run;
+
+/****
+5/13/2025
+ALQ101 = 1 and ALQ110 = 1 and ALQ160 >= 1 then binge_alq_g3
+*****/;
+proc freq data=pt_2;
+ table ALQ101 *ALQ110 ALQ160/missing;
+ run;
+
+/* Gender: RIAGENDR vs. female */
+proc freq data=pt_2;
+    tables RIAGENDR*female / missing list;
+    title 'Check Gender Recode: RIAGENDR vs. female 1=Female, 0=Male';
+run;
+
+/* Education: DMDEDUC2 vs. edu */
+proc freq data=pt_2;
+    tables DMDEDUC2*edu / missing list;
+    title 'Check Education Recode: DMDEDUC2 vs. edu 1=Less than HS, 2=Some HS, 3=HS graduate or more';
+run;
+
+/* Poverty index: INDFMPIR vs. pirg4 */
+proc freq data=pt_2;
+    tables pirg4 / missing;
+    title 'Check Poverty Grouping: pirg4 1=<1.0, 2=1.01-2.0, 3=2.01-4.0, 4=>4.0';
+run;
+
+/* Race: RIDRETH1 -> race and race3 */
+proc freq data=pt_2;
+    tables RIDRETH1*race3 / missing list;
+    title 'Check Race Recode: RIDRETH1 vs. race3 3-group: 1=White, 2=Black, 3=Hispanic/Other';
 run;
 
 proc freq data=pt_2;
@@ -882,6 +1168,7 @@ run;
 
 * The above works as elig (1) = 2155*;
 
+/* Table 1 */
 ************************* ONLY ELIG STATS - NO OUTCOMES ***************************;
 /* PROC SURVEYMEANS for continuous variables */
 proc surveymeans data=pt_2 mean stderr clm;
@@ -892,7 +1179,9 @@ proc surveymeans data=pt_2 mean stderr clm;
     var age; /* Add other continuous variables if needed later */
     title "Weighted Descriptive Statistics for Continuous Variables among Eligible Participants";
 run;
-
+proc freq data=pt_2;
+ table elig;
+ run;
 /* PROC SURVEYFREQ for categorical variables */
 
 /* Macro to automate surveyfreq for categorical variables */
@@ -908,6 +1197,7 @@ run;
 %mend sfreq;
 
 /* Call macro separately for each categorical variable */
+%sfreq(peri_g2);
 %sfreq(female);
 %sfreq(edu);
 %sfreq(pirg4);
@@ -916,38 +1206,74 @@ run;
 %sfreq(BMI_category);
 %sfreq(Diabetes_status);
 %sfreq(Ever_Smoker);
-%sfreq(Binge_Drinking);
+%sfreq(Now_Smoker);
+%sfreq(Smoker);
+%sfreq(binge_alq_g3);
+%sfreq(med_yn);
+%sfreq(hvy_alq_g3);
 %sfreq(Marital_Status);
 %sfreq(Xerostomia);
 %sfreq(Caries_YN);
 %sfreq(Missing_Teeth_YN);
-%sfreq(med_yn);
 
 ************************* ELIG STATS - WITH OUTCOMES ***************************;
 
 /* Weighted Descriptive Statistics by Salty and Bitter Outcomes (using pt_2) */
 
+proc freq data=pt_2;
+where elig = 1;
+ table disab_salty_all disab_bit_all;
+ run;
+
 /* PROC SURVEYMEANS for Continuous Variable (Age) by Salty Outcome */
+
+%macro smean_salty(var);
 proc surveymeans data=pt_2 mean stderr clm;
     strata sdmvstra;
     cluster sdmvpsu;
     weight wtmec2yr;
     domain elig*disab_salty_all;
     where elig = 1;
-    var age;
-    title "Weighted Means of Age by Salty Taste Disability (Eligible Participants)";
+    var &var.;
+    title "Weighted Means of &var by Salty Taste Disability (Eligible Participants)";
 run;
 
+proc surveyreg data=pt_2;
+   strata sdmvstra;
+   cluster sdmvpsu;
+   weight wtmec2yr;
+   where elig=1;
+   model &var. = disab_salty_all;
+run;
+%mend(smean_salty);
+
+%smean_salty(age);
+%smean_salty(c_count);
+
 /* PROC SURVEYMEANS for Continuous Variable (Age) by Bitter Outcome */
+
+%macro smean_bitter(var);
 proc surveymeans data=pt_2 mean stderr clm;
     strata sdmvstra;
     cluster sdmvpsu;
     weight wtmec2yr;
     domain elig*disab_bit_all;
     where elig = 1;
-    var age;
-    title "Weighted Means of Age by Bitter Taste Disability (Eligible Participants)";
+    var &var.;
+    title "Weighted Means of &var by Bitter Taste Disability (Eligible Participants)";
 run;
+
+proc surveyreg data=pt_2;
+   strata sdmvstra;
+   cluster sdmvpsu;
+   weight wtmec2yr;
+   where elig=1;
+   model &var. = disab_bit_all;
+run;
+%mend(smean_bitter);
+
+%smean_bitter(age);
+%smean_bitter(c_count);
 
 /* Macros for Categorical Variables */
 
@@ -957,7 +1283,7 @@ run;
         strata sdmvstra;
         cluster sdmvpsu;
         weight wtmec2yr;
-        tables elig * disab_salty_all * &var. / row chisq;
+        tables elig * disab_salty_all * &var. /  col chisq;
         where elig = 1;
         title "Weighted Frequency of &var by Salty Taste Disability (Eligible Participants)";
     run;
@@ -969,7 +1295,7 @@ run;
         strata sdmvstra;
         cluster sdmvpsu;
         weight wtmec2yr;
-        tables elig * disab_bit_all * &var. / row chisq;
+        tables elig * disab_bit_all * &var. /  col chisq;
         where elig = 1;
         title "Weighted Frequency of &var by Bitter Taste Disability (Eligible Participants)";
     run;
@@ -978,6 +1304,7 @@ run;
 /* Running All Categorical Variables */
 
 /* Run for Salty Outcome */
+%sfreq_salty(peri_g2);
 %sfreq_salty(female);
 %sfreq_salty(edu);
 %sfreq_salty(pirg4);
@@ -986,14 +1313,18 @@ run;
 %sfreq_salty(BMI_category);
 %sfreq_salty(Diabetes_status);
 %sfreq_salty(Ever_Smoker);
-%sfreq_salty(Binge_Drinking);
+%sfreq_salty(Now_Smoker);
+%sfreq_salty(Smoker);
+%sfreq_salty(binge_alq_g3);
+%sfreq_salty(hvy_alq_g3)
+%sfreq_salty(med_yn);
 %sfreq_salty(Marital_Status);
 %sfreq_salty(Xerostomia);
 %sfreq_salty(Caries_YN);
 %sfreq_salty(Missing_Teeth_YN);
-%sfreq_salty(med_yn);
 
 /* Run for Bitter Outcome */
+%sfreq_bitter(peri_g2);
 %sfreq_bitter(female);
 %sfreq_bitter(edu);
 %sfreq_bitter(pirg4);
@@ -1002,26 +1333,29 @@ run;
 %sfreq_bitter(BMI_category);
 %sfreq_bitter(Diabetes_status);
 %sfreq_bitter(Ever_Smoker);
-%sfreq_bitter(Binge_Drinking);
+%sfreq_bitter(Now_Smoker);
+%sfreq_bitter(Smoker);
+%sfreq_bitter(binge_alq_g3);
+%sfreq_bitter(hvy_alq_g3)
+%sfreq_bitter(med_yn);
 %sfreq_bitter(Marital_Status);
 %sfreq_bitter(Xerostomia);
 %sfreq_bitter(Caries_YN);
 %sfreq_bitter(Missing_Teeth_YN);
-%sfreq_bitter(med_yn);
 
 proc surveylogistic data=pt_2;
     strata sdmvstra;
     cluster sdmvpsu;
     weight wtmec2yr;
     domain elig;
-    class female(ref='0') edu(ref='3') pirg4(ref='4') race(ref='1') race3(ref='1')
-          BMI_category(ref='1') Diabetes_status(ref='2') Ever_Smoker(ref='1') 
-          Binge_Drinking(ref='0') Marital_Status(ref='1') Xerostomia(ref='0')
+    class female(ref='0') edu(ref='1') pirg4(ref='1') race(ref='1') race3(ref='1')
+          BMI_category(ref='1') Diabetes_status(ref='0') Smoker(ref='0') 
+          binge_alq_g3(ref='1') hvy_alq_g3(ref='1') Marital_Status(ref='1') Xerostomia(ref='0')
           Caries_YN(ref='0') Missing_Teeth_YN(ref='0') med_yn(ref='0') / param=ref;
     model disab_salty_all(event='1') = 
           age 
           female edu pirg4 race race3 BMI_category Diabetes_status 
-          Ever_Smoker Binge_Drinking Marital_Status Xerostomia 
+          Ever_Smoker binge_alq_g3 hvy_alq_g3 Marital_Status Xerostomia 
           Caries_YN Missing_Teeth_YN med_yn/ link=logit df=infinity;;
     title "Survey Logistic Regression: Salty Taste Disability (Eligible Participants)";
 run;
@@ -1031,20 +1365,86 @@ proc surveylogistic data=pt_2;
     cluster sdmvpsu;
     weight wtmec2yr;
     domain elig;
-    class female(ref='0') edu(ref='3') pirg4(ref='4') race(ref='1') race3(ref='1')
-          BMI_category(ref='1') Diabetes_status(ref='2') Ever_Smoker(ref='1') 
-          Binge_Drinking(ref='0') Marital_Status(ref='1') Xerostomia(ref='0')
+    class female(ref='0') edu(ref='1') pirg4(ref='1') race(ref='1') race3(ref='1')
+          BMI_category(ref='1') Diabetes_status(ref='0') Smoker(ref='0') 
+          binge_alq_g3(ref='1') hvy_alq_g3(ref='1') Marital_Status(ref='1') Xerostomia(ref='0')
           Caries_YN(ref='0') Missing_Teeth_YN(ref='0') med_yn(ref='0') / param=ref;
     model disab_bit_all(event='1') = 
           age 
           female edu pirg4 race race3 BMI_category Diabetes_status 
-          Ever_Smoker Binge_Drinking Marital_Status Xerostomia 
+          Ever_Smoker binge_alq_g3 hvy_alq_g3 Marital_Status Xerostomia 
           Caries_YN Missing_Teeth_YN med_yn/ link=logit df=infinity;;
     title "Survey Logistic Regression: Bitter Taste Disability (Eligible Participants)";
 run;
 
+
 /*============================================*/
-/* SECTION 7 : FREQUENCY TABLES */
+/* SECTION 7 : LOGISTIC MODELS */
+/*============================================*/
+
+/* 06/11 NOTES: p(<0.1)surveylogistic multivariate model for salty and bitter only including the significant predictors*/
+/* The below models don't show significant findings */
+data logit_data;
+    set PT_2;
+    IF ELIG =1;
+    /* Creating the 4 vs 2-3 periodontitis stage variable */
+    if peri_stage_N in (2,3) then peri_stage_4vs23 = 0;
+    else if peri_stage_N = 4 then peri_stage_4vs23 = 1;
+    else peri_stage_4vs23 = .;
+run;
+
+proc freq data=logit_data;
+ tables peri_g2 elig;
+run;
+
+proc contents data=logit_data;
+
+/* Common CLASS statement for all models */
+%let classvars = peri_g2 peri_stage_4vs23(ref='0') 
+                 race3(ref='1') female(ref='0') binge_alq_g3(ref='1') Smoker(ref='0');
+
+/* SET 1 - Salty disability ~ peri_g2 */
+proc surveylogistic data=logit_data;
+    class &classvars / param=ref;
+    model disab_salty_all(event='1') = peri_g2 age race3 female binge_alq_g3 Smoker;
+    weight wtmec2yr;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    title "SET 1: Salty disability ~ peri_g2 adjusted for age, race, sex, binge, smoking";
+run;
+
+/* SET 2 - Salty disability ~ peri_stage_4vs23 */
+proc surveylogistic data=logit_data;
+    class &classvars / param=ref;
+    model disab_salty_all(event='1') = peri_stage_4vs23 age race3 female binge_alq_g3 Smoker;
+    weight wtmec2yr;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    title "SET 2: Salty disability ~ peri_stage_4vs23 adjusted for age, race, sex, binge, smoking";
+run;
+
+/* SET 3 - Bitter disability ~ peri_g2 */
+proc surveylogistic data=logit_data;
+    class &classvars / param=ref;
+    model disab_bit_all(event='1') = peri_g2 age race3 female binge_alq_g3 Smoker;
+    weight wtmec2yr;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    title "SET 3: Bitter disability ~ peri_g2 adjusted for age, race, sex, binge, smoking";
+run;
+
+/* SET 4 - Bitter disability ~ peri_stage_4vs23 */
+proc surveylogistic data=logit_data;
+    class &classvars / param=ref;
+    model disab_bit_all(event='1') = peri_stage_4vs23 age race3 female binge_alq_g3 Smoker;
+    weight wtmec2yr;
+    strata sdmvstra;
+    cluster sdmvpsu;
+    title "SET 4: Bitter disability ~ peri_stage_4vs23 adjusted for age, race, sex, binge, smoking";
+run;
+
+/*============================================*/
+/* SECTION 8 : FREQUENCY TABLES */
 /*============================================*/
 
 /**************************** FREQUENCY TABLES ***********************************/
@@ -1227,3 +1627,88 @@ data per_stage_PI_n9;
 	;
 
  *************/;
+
+
+/***********************
+LinHY, 5/1/2025 check 
+ *************************************/;
+ 
+proc freq data=pt_2;
+ where elig=1;
+ *table RIAGENDR female DMDEDUC2 edu ;
+ *table RIDRETH1  race race3;
+*table DIQ010 Diabetes_status SMQ020 Ever_Smoker ALQ151 binge_alq_g3;
+*table DMDMARTL Marital_Status;
+table CSQ202 Xerostomia;
+table C_Count Caries_YN;
+ run;
+proc means data=pt_2;
+class pirg4;
+var INDFMPIR  ;
+run;
+proc means data=pt_2;
+ where elig=1;
+ class BMI_category;
+ var BMXBMI;
+run;
+ 
+
+/*** check carries status */
+
+proc freq data=pt_2;
+ where elig=1;
+ *table OHX2CTC c_2  OHX3CTC  c_3;
+ table c_count ;
+ run;
+
+proc print data= pt_2 (obs=50);
+ var c_2   c_3  c_4 c_count; 
+ run;
+
+proc print data= pt_2 (obs=50);
+ where c_count=.;
+ var c_count c_2    c_3   c_4   c_5    c_6   c_7   c_8    c_9   c_10   c_11  c_12     c_13   c_14   c_15  
+         c_18    c_19   c_20   c_21  c_22     c_23   c_24   c_25  c_26   c_27   c_28    c_29   c_30   c_31 ;
+run; 
+proc contents data=pt_2;
+run;
+/*
+remaining_teeth='remaining teeth count based on 32 teeth'
+remaining_teeth_p28='remaining teeth count based on 28 teeth'
+*/
+
+proc freq data=pt_2;
+ where elig=1;
+ table remaining_teeth remaining_teeth_p28 Missing_Teeth_YN;
+ run;
+
+/*
+ ALQ101 - Had at least 12 alcohol drinks/1 yr? 1: yes, 2: no, 7/9/. 
+	  
+	ALQ141Q - # days have 4/5 drinks - past 12 mos
+	ALQ151 - Ever have 4/5 or more drinks every day?
+ ***/
+
+ proc freq data=pt_2;
+ *where elig=1;
+  table  ALQ101 *ALQ141Q /missing;
+  run;
+
+
+
+  /*****
+5/16/2025
+  To Mansi,
+#1. Move the medicine dataset to the top, so all datasets can merge once. 
+    Recode medicine in the main data step 
+    var name: med_yn
+
+data pt_2a;
+ set permdata.peri_taste_n10175_250516;
+run;
+
+#2. Revise alcohol-related factors. 
+  Define missing values for each variable and then combine the processed variables to create a new variable 
+  
+ 
+*****/; 
